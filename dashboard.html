@@ -182,6 +182,135 @@
     </div>
   </section>
 
+  <!-- ══ TAB: operations & SLA ════════════════════════════════════════ -->
+  <section x-show="tab === 'ops'" class="mt-8 space-y-6">
+
+    <!-- SLA objectives -->
+    <div class="overflow-hidden rounded-xl border border-line bg-surface">
+      <div class="flex items-baseline justify-between border-b border-line px-5 py-3.5">
+        <h3 class="text-sm font-semibold">Service level objectives</h3>
+        <span class="text-xs text-muted">measured window · <span class="font-mono" x-text="ops.window"></span></span>
+      </div>
+      <table class="w-full text-left text-sm">
+        <thead class="bg-raised/40 text-xs uppercase tracking-wider text-muted">
+          <tr>
+            <th class="px-5 py-2.5 font-medium">Objective</th>
+            <th class="px-5 py-2.5 font-medium">Target</th>
+            <th class="px-5 py-2.5 font-medium">Current</th>
+            <th class="px-5 py-2.5 font-medium">Attainment</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-line/70">
+          <template x-for="s in ops.slos" :key="s.name">
+            <tr>
+              <td class="px-5 py-3">
+                <p class="font-medium" x-text="s.name"></p>
+                <p class="mt-0.5 text-xs text-muted" x-text="s.note"></p>
+              </td>
+              <td class="px-5 py-3 font-mono text-xs text-muted" x-text="s.target"></td>
+              <td class="px-5 py-3 font-mono text-sm tabular-nums" x-text="s.current"></td>
+              <td class="px-5 py-3">
+                <div class="flex items-center gap-2">
+                  <div class="h-1.5 w-28 overflow-hidden rounded-full bg-raised">
+                    <div class="h-full rounded-full"
+                         :class="s.pct >= 100 ? 'bg-emerald-400' : s.pct >= 75 ? 'bg-amber-400' : 'bg-red-400'"
+                         :style="`width:${Math.min(s.pct, 100)}%`"></div>
+                  </div>
+                  <span class="font-mono text-xs tabular-nums"
+                        :class="s.pct >= 100 ? 'text-emerald-300' : s.pct >= 75 ? 'text-amber-300' : 'text-red-300'"
+                        x-text="s.pct === null ? 'n/a' : s.pct + '%'"></span>
+                </div>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- agent + CI panels -->
+    <div class="grid gap-5 lg:grid-cols-2">
+
+      <div class="rounded-xl border border-line bg-surface p-5">
+        <h3 class="text-sm font-semibold">Agent runtime</h3>
+        <p class="mt-1 text-xs text-muted">Devin sessions dispatched by the remediation workflow.</p>
+        <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+          <template x-for="m in ops.agent" :key="m.k">
+            <div class="rounded-lg border border-line bg-raised/50 px-3 py-2.5">
+              <dt class="text-[11px] uppercase tracking-wider text-muted" x-text="m.k"></dt>
+              <dd class="mt-0.5 font-mono text-lg tabular-nums" :class="m.tone || 'text-fg'" x-text="m.v"></dd>
+              <dd class="text-[11px] text-muted" x-text="m.d"></dd>
+            </div>
+          </template>
+        </dl>
+      </div>
+
+      <div class="rounded-xl border border-line bg-surface p-5">
+        <h3 class="text-sm font-semibold">CI health · automation branch</h3>
+        <p class="mt-1 text-xs text-muted">GitHub Actions runs on <span class="font-mono">devin/…-self-heal-automation</span>.</p>
+        <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+          <template x-for="m in ops.ci" :key="m.k">
+            <div class="rounded-lg border border-line bg-raised/50 px-3 py-2.5">
+              <dt class="text-[11px] uppercase tracking-wider text-muted" x-text="m.k"></dt>
+              <dd class="mt-0.5 font-mono text-lg tabular-nums" :class="m.tone || 'text-fg'" x-text="m.v"></dd>
+              <dd class="text-[11px] text-muted" x-text="m.d"></dd>
+            </div>
+          </template>
+        </dl>
+
+        <div class="mt-4">
+          <p class="text-[11px] uppercase tracking-wider text-muted">Run outcomes</p>
+          <div class="mt-2 flex h-2 overflow-hidden rounded-full bg-raised">
+            <template x-for="b in ops.runMix" :key="b.k">
+              <div :class="b.cls" :style="`width:${b.n / ops.runTotal * 100}%`" :title="`${b.k}: ${b.n}`"></div>
+            </template>
+          </div>
+          <div class="mt-2 flex flex-wrap gap-3 text-[11px] text-muted">
+            <template x-for="b in ops.runMix" :key="b.k">
+              <span class="inline-flex items-center gap-1.5">
+                <span class="h-2 w-2 rounded-sm" :class="b.cls"></span>
+                <span x-text="`${b.k} ${b.n}`"></span>
+              </span>
+            </template>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- engineering effectiveness -->
+    <div class="rounded-xl border border-line bg-surface p-5">
+      <h3 class="text-sm font-semibold">Engineering effectiveness</h3>
+      <div class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <template x-for="m in ops.eng" :key="m.k">
+          <div class="rounded-lg border border-line bg-raised/50 p-4">
+            <p class="text-[11px] uppercase tracking-wider text-muted" x-text="m.k"></p>
+            <p class="mt-1 font-mono text-2xl tabular-nums" :class="m.tone || 'text-fg'" x-text="m.v"></p>
+            <p class="mt-1 text-xs leading-snug text-muted" x-text="m.d"></p>
+          </div>
+        </template>
+      </div>
+    </div>
+
+    <!-- open failures -->
+    <div class="rounded-xl border border-line bg-surface p-5">
+      <h3 class="text-sm font-semibold">Failure log</h3>
+      <ul class="mt-3 space-y-2">
+        <template x-for="f in ops.failures" :key="f.what + f.when">
+          <li class="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-raised/50 px-3 py-2.5 text-sm">
+            <span class="rounded-md border px-2 py-0.5 text-xs font-medium"
+                  :class="f.resolved ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-red-500/30 bg-red-500/10 text-red-300'"
+                  x-text="f.resolved ? 'resolved' : 'open'"></span>
+            <span class="font-mono text-xs" x-text="f.what"></span>
+            <span class="text-xs text-muted" x-text="f.cause"></span>
+            <span class="ml-auto font-mono text-[11px] text-muted" x-text="f.when"></span>
+          </li>
+        </template>
+      </ul>
+      <p class="mt-3 text-xs text-muted">
+        Counts exclude <span class="font-mono">cancelled</span> runs, which are superseded by a newer push rather than genuine failures.
+      </p>
+    </div>
+  </section>
+
   <!-- ══ TAB: architecture ════════════════════════════════════════════ -->
   <section x-show="tab === 'arch'" class="mt-8 space-y-6">
 
@@ -323,7 +452,7 @@ function dashboard() {
         summary: "Session running. Verifying whether Flask 3 / Werkzeug 3 is compatible with the pinned flask-appbuilder stack before regenerating any lockfile." },
       { number: 2, title: "setuptools 80.9.0 → 83.0.0", advisory: "PYSEC-2026-3447", severity: "high",
         category: "python-dependency", fingerprint: "py:setuptools:PYSEC-2026-3447", status: "needs_human",
-        session_url: "https://app.devin.ai/sessions/3232d17a58724c589441d62654b855d0", acus: 3.4, pull_request: null,
+        session_url: "https://app.devin.ai/sessions/3232d17a58724c589441d62654b855d0", acus: 0, pull_request: null,
         comment_url: "https://github.com/salman-devin/superset/issues/2#issuecomment-5134157026",
         summary: "Guardrail held. setuptools<81 is a deliberate pin: pkg_resources is removed from setuptools ≥82 and sqlalchemy-redshift<0.9 imports it at module load. The session reproduced the ModuleNotFoundError in a clean venv, established that the pkg_resources-free sqlalchemy-redshift 1.0.0 requires SQLAlchemy ≥2 (Superset pins <2), and escalated instead of shipping a breaking bump." },
       { number: 3, title: "paramiko 3.5.1 SHA-1 RSA", advisory: "PYSEC-2026-2858", severity: "moderate",
@@ -364,6 +493,7 @@ function dashboard() {
     tab: 'feed',
     tabs: [
       { id: 'feed',  label: 'Task feed' },
+      { id: 'ops',   label: 'Operations & SLA' },
       { id: 'arch',  label: 'Architecture' },
       { id: 'sim',   label: 'Simulator' },
     ],
@@ -404,7 +534,7 @@ function dashboard() {
         { label: 'Issues tracked', value: i.length, icon: '📋', tone: 'text-fg',
           hint: `${i.filter(x => x.severity === 'critical' || x.severity === 'high').length} high or critical` },
         { label: 'Sessions started', value: sessions.length, icon: '🤖', tone: 'text-accent',
-          hint: `${i.filter(x => x.status === 'in_progress').length} running · ${acus.toFixed(1)} ACUs used` },
+          hint: `${i.filter(x => x.status === 'in_progress').length} running · ${acus.toFixed(1)} ACUs reported` },
         { label: 'Resolved by agent', value: resolved.length, icon: '✅', tone: 'text-emerald-400',
           hint: `${i.filter(x => x.status === 'pr_generated').length} PRs · ${i.filter(x => x.status === 'needs_human').length} escalated` },
         { label: 'Guardrail rate', value: sessions.length ? Math.round(i.filter(x => x.status === 'needs_human').length / resolved.length * 100) + '%' : '—',
@@ -423,8 +553,58 @@ function dashboard() {
         by_status: this.filters.filter(f => f !== 'all').reduce((o, f) => {
           o[f] = this.data.issues.filter(i => i.status === f).length; return o;
         }, {}),
+        operations: this.ops,
         issues: this.data.issues,
       }, null, 2);
+    },
+
+    ops: {
+      window: "2026-07-30T17:00Z → 18:40Z",
+      slos: [
+        { name: "Finding → issue filed", note: "not yet measured: workflows have not run natively in Actions", target: "≤ 10 min", current: "—", pct: null },
+        { name: "Label → session dispatched", note: "not yet measured: webhook path exercised locally only", target: "≤ 5 min", current: "—", pct: null },
+        { name: "Session → terminal outcome", note: "n=1 terminal session (#2); #1 still running", target: "≤ 60 min", current: "33m 02s", pct: 100 },
+        { name: "Autonomous resolution rate", note: "sessions ending in a merged-ready PR", target: "≥ 50%", current: "0% (0/1)", pct: 0 },
+        { name: "Guardrail precision", note: "escalations that were correct on review", target: "100%", current: "100% (1/1)", pct: 100 },
+        { name: "Unsafe PRs shipped", note: "changes forced past a known incompatibility", target: "0", current: "0", pct: 100 },
+      ],
+      agent: [
+        { k: "Sessions dispatched", v: "2", d: "issues #1, #2" },
+        { k: "Terminal", v: "1", d: "1 still running" },
+        { k: "Mean time to outcome", v: "33m", d: "n=1 — not yet a stable percentile" },
+        { k: "ACUs reported", v: "0.0", d: "API returns 0.0 for both sessions" },
+        { k: "Escalation rate", v: "100%", d: "1 of 1 terminal sessions", tone: "text-amber-300" },
+        { k: "Session API errors", v: "0", d: "after moving v1 → v3 org endpoints", tone: "text-emerald-400" },
+      ],
+      ci: [
+        { k: "Runs", v: "87", d: "43 reached a verdict" },
+        { k: "Success rate", v: "90.7%", d: "39 success / 4 failure", tone: "text-emerald-400" },
+        { k: "Median duration", v: "1m 44s", d: "p95 8m 42s · max 13m 35s" },
+        { k: "Compute time", v: "114.5m", d: "billable minutes across the branch" },
+      ],
+      runMix: [
+        { k: "success", n: 39, cls: "bg-emerald-500" },
+        { k: "cancelled", n: 33, cls: "bg-line" },
+        { k: "in progress", n: 6, cls: "bg-accent" },
+        { k: "skipped", n: 5, cls: "bg-raised" },
+        { k: "failure", n: 4, cls: "bg-red-500" },
+      ],
+      runTotal: 87,
+      eng: [
+        { k: "Findings detected", v: "9", d: "7 unique fingerprints after transitive-chain collapse" },
+        { k: "Triage automation", v: "100%", d: "every issue filed by the scanner, none hand-written", tone: "text-emerald-400" },
+        { k: "Auto-remediable share", v: "44%", d: "4 of 9 findings have a safe mechanical fix" },
+        { k: "Duplicate issues filed", v: "0", d: "fingerprint dedup across scan runs", tone: "text-emerald-400" },
+        { k: "Human touchpoints", v: "2", d: "repo secret setup + one escalation review" },
+        { k: "Secret exposure surface", v: "1 job", d: "DEVIN_API_KEY reaches only the safe-output job" },
+        { k: "Mean lead time to fix", v: "n/a", d: "no autonomous PR merged yet" },
+        { k: "Backlog age (oldest open)", v: "9 issues", d: "all opened this window; ageing starts next scan" },
+      ],
+      failures: [
+        { what: "validate-all-ghas", cause: "action-validator 0.6.0 cannot parse gh-aw generated *.lock.yml", when: "17:24, 17:27", resolved: true },
+        { what: "dependency-review", cause: "Dependency graph disabled on the repository — not a code defect", when: "17:27, 17:46", resolved: false },
+        { what: "devin API /v1/sessions", cause: "403 for org service-user key; migrated to /v3 org-scoped endpoints", when: "17:20", resolved: true },
+      ],
     },
 
     laneScan: [
