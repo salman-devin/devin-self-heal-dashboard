@@ -278,7 +278,7 @@
       <template x-if="simLog.length">
         <div class="mt-5 space-y-1.5 rounded-lg border border-line bg-canvas p-4 font-mono text-xs">
           <template x-for="(l, i) in simLog" :key="i">
-            <p :class="l.cls" x-text="l.text"></p>
+            <p class="break-all" :class="l.cls" x-text="l.text"></p>
           </template>
         </div>
       </template>
@@ -370,7 +370,7 @@ function dashboard() {
     filter: 'all',
     open: null,
     copied: false,
-    simIssue: 6,
+    simIssue: 1,
     simAcu: 20,
     simTimeout: 4200,
     simLog: [],
