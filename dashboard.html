@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Devin Self-Heal · salman-devin/superset</title>
+<title>Devin Self-Heal · maintenance automation dashboard</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
 <script src="https://cdn.tailwindcss.com"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
@@ -12,67 +12,62 @@
     theme: {
       extend: {
         colors: {
-          canvas: '#0a0c10',
-          surface: '#0d1117',
-          raised: '#151b23',
-          line: '#2a313c',
-          muted: '#8b949e',
-          fg: '#e6edf3',
-          accent: '#2f81f7',
+          canvas: '#0a0c10', surface: '#0d1117', raised: '#151b23',
+          line: '#2a313c', muted: '#8b949e', fg: '#e6edf3', accent: '#2f81f7',
         },
-        fontFamily: {
-          mono: ['ui-monospace', 'SFMono-Regular', 'SF Mono', 'Menlo', 'monospace'],
-        },
+        fontFamily: { mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'] },
       },
     },
   };
 </script>
 <style>
   html { color-scheme: dark; }
-  body { -webkit-font-smoothing: antialiased; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: #0d1117; }
   ::-webkit-scrollbar-thumb { background: #2a313c; border-radius: 6px; }
-  ::-webkit-scrollbar-thumb:hover { background: #3d444d; }
   [x-cloak] { display: none !important; }
-  .grid-bg {
-    background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,.055) 1px, transparent 0);
-    background-size: 22px 22px;
-  }
-  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(47,129,247,.45); } 70% { box-shadow: 0 0 0 7px rgba(47,129,247,0); } 100% { box-shadow: 0 0 0 0 rgba(47,129,247,0); } }
+  .grid-bg { background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,.055) 1px, transparent 0); background-size: 22px 22px; }
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(47,129,247,.45);} 70% { box-shadow: 0 0 0 7px rgba(47,129,247,0);} 100% { box-shadow: 0 0 0 0 rgba(47,129,247,0);} }
   .live-dot { animation: pulse-ring 2s infinite; }
+  /* glossary term */
+  .term { border-bottom: 1px dotted #6b7684; cursor: help; }
 </style>
 </head>
 
-<body class="bg-canvas text-fg font-sans antialiased" x-data="dashboard()" x-cloak>
+<body class="bg-canvas text-fg antialiased" x-data="dashboard()" x-init="boot()" x-cloak>
 
 <!-- ── header ─────────────────────────────────────────────────────────── -->
 <header class="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur">
-  <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-6 py-3.5">
+  <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-6 py-3">
     <div class="flex items-center gap-3">
       <span class="grid h-9 w-9 place-items-center rounded-lg bg-accent/15 text-lg ring-1 ring-accent/30">🛡️</span>
       <div class="leading-tight">
         <h1 class="text-sm font-semibold tracking-tight">Devin Self-Heal</h1>
-        <a class="font-mono text-xs text-muted hover:text-accent" :href="`https://github.com/${data.repo}`" target="_blank" x-text="data.repo"></a>
+        <a class="font-mono text-xs text-muted hover:text-accent" :href="`https://github.com/${repo}`" target="_blank" x-text="repo"></a>
       </div>
     </div>
 
-    <span class="ml-2 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
-      <span class="live-dot h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Automation armed
+    <span class="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium"
+          :class="live ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/25 bg-amber-500/10 text-amber-300'">
+      <span class="h-1.5 w-1.5 rounded-full" :class="live ? 'live-dot bg-emerald-400' : 'bg-amber-400'"></span>
+      <span x-text="loading ? 'Refreshing…' : live ? 'Live · GitHub API' : 'Offline snapshot'"></span>
     </span>
 
-    <nav class="ml-auto flex items-center gap-1 text-sm">
+    <nav class="ml-auto flex flex-wrap items-center gap-1 text-sm">
       <template x-for="t in tabs" :key="t.id">
-        <button @click="tab = t.id"
-                class="rounded-md px-3 py-1.5 transition"
+        <button @click="tab = t.id" class="rounded-md px-3 py-1.5 transition"
                 :class="tab === t.id ? 'bg-raised text-fg ring-1 ring-line' : 'text-muted hover:text-fg'"
                 x-text="t.label"></button>
       </template>
-      <a :href="data.automation_pr" target="_blank"
-         class="ml-2 rounded-md border border-line bg-raised px-3 py-1.5 text-sm text-muted transition hover:border-accent/50 hover:text-fg">
-        PR&nbsp;#10 ↗
-      </a>
+      <button @click="refresh()" :disabled="loading"
+              class="ml-1 rounded-md border border-line bg-raised px-2.5 py-1.5 text-sm text-muted transition hover:text-fg disabled:opacity-50"
+              title="Re-query the GitHub API now">↻</button>
     </nav>
+  </div>
+
+  <div x-show="error" class="border-t border-red-500/30 bg-red-500/10 px-6 py-2 text-xs text-red-200">
+    <span x-text="error"></span>
+    <span x-show="!token"> — add a GitHub token in <button class="underline" @click="tab='config'">Config</button> to raise the unauthenticated rate limit (60 requests/hour).</span>
   </div>
 </header>
 
@@ -81,9 +76,9 @@
   <!-- ── stats ────────────────────────────────────────────────────────── -->
   <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
     <template x-for="s in stats" :key="s.label">
-      <div class="rounded-xl border border-line bg-surface p-5 transition hover:border-line/80 hover:bg-raised/60">
+      <div class="rounded-xl border border-line bg-surface p-5 transition hover:border-line/80">
         <div class="flex items-start justify-between">
-          <p class="text-xs uppercase tracking-wider text-muted" x-text="s.label"></p>
+          <p class="text-xs uppercase tracking-wider text-muted" :title="s.help" x-text="s.label"></p>
           <span class="text-base opacity-70" x-text="s.icon"></span>
         </div>
         <p class="mt-2 text-3xl font-semibold tabular-nums" :class="s.tone" x-text="s.value"></p>
@@ -98,26 +93,30 @@
     <div class="flex flex-wrap items-center gap-2">
       <template x-for="f in filters" :key="f">
         <button @click="filter = f"
-                class="rounded-full border px-3 py-1 text-xs capitalize transition"
+                class="rounded-full border px-3 py-1 text-xs transition"
                 :class="filter === f ? 'border-accent/50 bg-accent/15 text-accent' : 'border-line bg-surface text-muted hover:text-fg'">
-          <span x-text="f === 'all' ? 'all' : statusMeta[f].label"></span>
-          <span class="ml-1 tabular-nums opacity-60" x-text="f === 'all' ? data.issues.length : data.issues.filter(i => i.status === f).length"></span>
+          <span x-text="f === 'all' ? 'All' : statusMeta[f].label"></span>
+          <span class="ml-1 tabular-nums opacity-60" x-text="f === 'all' ? issues.length : issues.filter(i => i.status === f).length"></span>
         </button>
       </template>
       <span class="ml-auto text-xs text-muted">
-        Sorted by severity · <span class="font-mono" x-text="visible.length"></span> shown
+        Highest severity first · <span class="font-mono" x-text="visible.length"></span> shown ·
+        updated <span class="font-mono" x-text="fetchedAgo"></span>
       </span>
     </div>
 
-    <div class="overflow-hidden rounded-xl border border-line bg-surface">
+    <div class="overflow-x-auto rounded-xl border border-line bg-surface">
       <table class="w-full text-left text-sm">
         <thead class="border-b border-line bg-raised/50 text-xs uppercase tracking-wider text-muted">
           <tr>
-            <th class="px-5 py-3 font-medium">Finding</th>
+            <th class="px-5 py-3 font-medium">Maintenance finding</th>
             <th class="px-5 py-3 font-medium">Severity</th>
             <th class="px-5 py-3 font-medium">Status</th>
-            <th class="px-5 py-3 font-medium">Devin session</th>
-            <th class="px-5 py-3 text-right font-medium">ACUs</th>
+            <th class="px-5 py-3 font-medium">Agent session</th>
+            <th class="px-5 py-3 font-medium">Fix</th>
+            <th class="px-5 py-3 text-right font-medium">
+              <span class="term" title="Agent Compute Unit — Devin's unit of agent work, roughly 15 minutes of active engineering time. Used for cost and effort tracking.">ACUs</span>
+            </th>
             <th class="w-8 px-5 py-3"></th>
           </tr>
         </thead>
@@ -127,49 +126,61 @@
             <tr class="cursor-pointer transition hover:bg-raised/50" @click="open = open === issue.number ? null : issue.number">
               <td class="px-5 py-3.5">
                 <div class="flex items-center gap-2">
-                  <a :href="`https://github.com/${data.repo}/issues/${issue.number}`" target="_blank" @click.stop
-                     class="font-mono text-xs text-muted hover:text-accent" x-text="`#${issue.number}`"></a>
+                  <a :href="issue.url" target="_blank" @click.stop class="font-mono text-xs text-muted hover:text-accent" x-text="`#${issue.number}`"></a>
                   <span class="font-medium" x-text="issue.title"></span>
+                  <span x-show="issue.state === 'closed'" class="rounded bg-violet-500/15 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-violet-300">closed</span>
                 </div>
-                <div class="mt-1 flex items-center gap-2 text-xs text-muted">
+                <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted">
                   <span class="rounded bg-raised px-1.5 py-0.5 font-mono" x-text="issue.category"></span>
-                  <span x-show="issue.advisory" class="font-mono" x-text="issue.advisory"></span>
+                  <template x-if="issue.advisory">
+                    <a :href="advisoryUrl(issue.advisory)" target="_blank" @click.stop class="font-mono hover:text-accent" x-text="issue.advisory"></a>
+                  </template>
+                  <span class="font-mono opacity-60" x-text="`opened ${issue.age}`"></span>
                 </div>
               </td>
               <td class="px-5 py-3.5">
-                <span class="rounded-md border px-2 py-0.5 text-xs font-medium capitalize"
-                      :class="severityMeta[issue.severity]" x-text="issue.severity"></span>
+                <span class="rounded-md border px-2 py-0.5 text-xs font-medium capitalize" :class="severityMeta[issue.severity]" x-text="issue.severity"></span>
               </td>
               <td class="px-5 py-3.5">
                 <span class="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium"
-                      :class="statusMeta[issue.status].cls">
+                      :class="statusMeta[issue.status].cls" :title="statusMeta[issue.status].help">
                   <span x-text="statusMeta[issue.status].icon"></span>
                   <span x-text="statusMeta[issue.status].label"></span>
                 </span>
               </td>
               <td class="px-5 py-3.5">
                 <template x-if="issue.session_url">
-                  <a :href="issue.session_url" target="_blank" @click.stop
-                     class="font-mono text-xs text-accent hover:underline"
-                     x-text="issue.session_url.split('/').pop().slice(0, 10) + '…'"></a>
+                  <a :href="issue.session_url" target="_blank" @click.stop class="font-mono text-xs text-accent hover:underline"
+                     x-text="issue.session_url.split('/').pop().slice(0, 8) + '…'"></a>
                 </template>
                 <span x-show="!issue.session_url" class="text-xs text-muted">—</span>
               </td>
-              <td class="px-5 py-3.5 text-right font-mono text-xs tabular-nums"
-                  :class="issue.acus ? 'text-fg' : 'text-muted'" x-text="issue.acus ? issue.acus.toFixed(1) : '—'"></td>
+              <td class="px-5 py-3.5">
+                <template x-if="issue.pull_request">
+                  <a :href="issue.pull_request" target="_blank" @click.stop
+                     class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 font-mono text-xs text-emerald-300 hover:bg-emerald-500/20"
+                     x-text="`PR #${issue.pull_request.split('/').pop()}`"></a>
+                </template>
+                <span x-show="!issue.pull_request" class="text-xs text-muted">—</span>
+              </td>
+              <td class="px-5 py-3.5 text-right font-mono text-xs tabular-nums" :class="issue.acus ? 'text-fg' : 'text-muted'"
+                  x-text="issue.acus ? issue.acus.toFixed(1) : '—'"></td>
               <td class="px-5 py-3.5 text-muted">
                 <span class="inline-block transition-transform" :class="open === issue.number && 'rotate-90'">›</span>
               </td>
             </tr>
             <tr x-show="open === issue.number" class="bg-canvas/60">
-              <td colspan="6" class="px-5 py-4">
-                <p class="max-w-4xl text-sm leading-relaxed text-muted" x-text="issue.summary"></p>
+              <td colspan="7" class="px-5 py-4">
+                <p class="max-w-4xl whitespace-pre-line text-sm leading-relaxed text-muted" x-text="issue.summary"></p>
                 <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
-                  <span class="rounded bg-raised px-2 py-1 font-mono text-muted" x-text="`fingerprint: ${issue.fingerprint}`"></span>
+                  <span x-show="issue.fingerprint" class="rounded bg-raised px-2 py-1 font-mono text-muted"
+                        title="Stable identifier for this finding. The scanner uses it to avoid filing the same issue twice."
+                        x-text="`fingerprint: ${issue.fingerprint}`"></span>
+                  <a :href="issue.url" target="_blank" class="rounded border border-line bg-raised px-2 py-1 text-muted hover:text-fg">Issue ↗</a>
                   <a x-show="issue.pull_request" :href="issue.pull_request" target="_blank"
                      class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-300 hover:bg-emerald-500/20">Pull request ↗</a>
                   <a x-show="issue.comment_url" :href="issue.comment_url" target="_blank"
-                     class="rounded border border-line bg-raised px-2 py-1 text-muted hover:text-fg">Status comment ↗</a>
+                     class="rounded border border-line bg-raised px-2 py-1 text-muted hover:text-fg">Automation status comment ↗</a>
                   <a x-show="issue.session_url" :href="issue.session_url" target="_blank"
                      class="rounded border border-line bg-raised px-2 py-1 text-muted hover:text-fg">Devin session ↗</a>
                 </div>
@@ -177,6 +188,9 @@
             </tr>
             </tbody>
           </template>
+          <tr x-show="!visible.length && !loading">
+            <td colspan="7" class="px-5 py-10 text-center text-sm text-muted">No issues match this filter.</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -185,11 +199,12 @@
   <!-- ══ TAB: operations & SLA ════════════════════════════════════════ -->
   <section x-show="tab === 'ops'" class="mt-8 space-y-6">
 
-    <!-- SLA objectives -->
     <div class="overflow-hidden rounded-xl border border-line bg-surface">
-      <div class="flex items-baseline justify-between border-b border-line px-5 py-3.5">
-        <h3 class="text-sm font-semibold">Service level objectives</h3>
-        <span class="text-xs text-muted">measured window · <span class="font-mono" x-text="ops.window"></span></span>
+      <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-5 py-3.5">
+        <h3 class="text-sm font-semibold">
+          <span class="term" title="Service Level Objective — the performance target the automation is held to, and how it is actually doing against that target.">Service level objectives</span>
+        </h3>
+        <span class="text-xs text-muted">computed from live GitHub and session data</span>
       </div>
       <table class="w-full text-left text-sm">
         <thead class="bg-raised/40 text-xs uppercase tracking-wider text-muted">
@@ -212,13 +227,9 @@
               <td class="px-5 py-3">
                 <div class="flex items-center gap-2">
                   <div class="h-1.5 w-28 overflow-hidden rounded-full bg-raised">
-                    <div class="h-full rounded-full"
-                         :class="s.pct >= 100 ? 'bg-emerald-400' : s.pct >= 75 ? 'bg-amber-400' : 'bg-red-400'"
-                         :style="`width:${Math.min(s.pct, 100)}%`"></div>
+                    <div class="h-full rounded-full" :class="barTone(s.pct)" :style="`width:${s.pct === null ? 0 : Math.min(s.pct, 100)}%`"></div>
                   </div>
-                  <span class="font-mono text-xs tabular-nums"
-                        :class="s.pct >= 100 ? 'text-emerald-300' : s.pct >= 75 ? 'text-amber-300' : 'text-red-300'"
-                        x-text="s.pct === null ? 'n/a' : s.pct + '%'"></span>
+                  <span class="font-mono text-xs tabular-nums" :class="textTone(s.pct)" x-text="s.pct === null ? 'n/a' : Math.min(s.pct, 100) + '%'"></span>
                 </div>
               </td>
             </tr>
@@ -227,16 +238,14 @@
       </table>
     </div>
 
-    <!-- agent + CI panels -->
     <div class="grid gap-5 lg:grid-cols-2">
-
       <div class="rounded-xl border border-line bg-surface p-5">
         <h3 class="text-sm font-semibold">Agent runtime</h3>
-        <p class="mt-1 text-xs text-muted">Devin sessions dispatched by the remediation workflow.</p>
-        <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+        <p class="mt-1 text-xs text-muted">Devin sessions dispatched by the remediation workflow, read from the automation's status comments.</p>
+        <dl class="mt-4 grid grid-cols-2 gap-3">
           <template x-for="m in ops.agent" :key="m.k">
             <div class="rounded-lg border border-line bg-raised/50 px-3 py-2.5">
-              <dt class="text-[11px] uppercase tracking-wider text-muted" x-text="m.k"></dt>
+              <dt class="text-[11px] uppercase tracking-wider text-muted" :title="m.help" x-text="m.k"></dt>
               <dd class="mt-0.5 font-mono text-lg tabular-nums" :class="m.tone || 'text-fg'" x-text="m.v"></dd>
               <dd class="text-[11px] text-muted" x-text="m.d"></dd>
             </div>
@@ -245,44 +254,45 @@
       </div>
 
       <div class="rounded-xl border border-line bg-surface p-5">
-        <h3 class="text-sm font-semibold">CI health · automation branch</h3>
-        <p class="mt-1 text-xs text-muted">GitHub Actions runs on <span class="font-mono">devin/…-self-heal-automation</span>.</p>
-        <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3">
+        <h3 class="text-sm font-semibold">Continuous integration health</h3>
+        <p class="mt-1 text-xs text-muted">Last 100 GitHub Actions runs on <span class="font-mono" x-text="repo"></span>.</p>
+        <dl class="mt-4 grid grid-cols-2 gap-3">
           <template x-for="m in ops.ci" :key="m.k">
             <div class="rounded-lg border border-line bg-raised/50 px-3 py-2.5">
-              <dt class="text-[11px] uppercase tracking-wider text-muted" x-text="m.k"></dt>
+              <dt class="text-[11px] uppercase tracking-wider text-muted" :title="m.help" x-text="m.k"></dt>
               <dd class="mt-0.5 font-mono text-lg tabular-nums" :class="m.tone || 'text-fg'" x-text="m.v"></dd>
               <dd class="text-[11px] text-muted" x-text="m.d"></dd>
             </div>
           </template>
         </dl>
-
         <div class="mt-4">
           <p class="text-[11px] uppercase tracking-wider text-muted">Run outcomes</p>
           <div class="mt-2 flex h-2 overflow-hidden rounded-full bg-raised">
             <template x-for="b in ops.runMix" :key="b.k">
-              <div :class="b.cls" :style="`width:${b.n / ops.runTotal * 100}%`" :title="`${b.k}: ${b.n}`"></div>
+              <div :class="b.cls" :style="`width:${ops.runTotal ? b.n / ops.runTotal * 100 : 0}%`" :title="`${b.k}: ${b.n}`"></div>
             </template>
           </div>
           <div class="mt-2 flex flex-wrap gap-3 text-[11px] text-muted">
             <template x-for="b in ops.runMix" :key="b.k">
               <span class="inline-flex items-center gap-1.5">
-                <span class="h-2 w-2 rounded-sm" :class="b.cls"></span>
-                <span x-text="`${b.k} ${b.n}`"></span>
+                <span class="h-2 w-2 rounded-sm" :class="b.cls"></span><span x-text="`${b.k} ${b.n}`"></span>
               </span>
             </template>
           </div>
+          <p class="mt-2 text-[11px] text-muted">
+            <span class="term" title="A run GitHub stopped because a newer commit superseded it. Not a real failure, so it is excluded from the success rate.">Cancelled</span>
+            runs are excluded from the success rate.
+          </p>
         </div>
       </div>
     </div>
 
-    <!-- engineering effectiveness -->
     <div class="rounded-xl border border-line bg-surface p-5">
       <h3 class="text-sm font-semibold">Engineering effectiveness</h3>
       <div class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <template x-for="m in ops.eng" :key="m.k">
           <div class="rounded-lg border border-line bg-raised/50 p-4">
-            <p class="text-[11px] uppercase tracking-wider text-muted" x-text="m.k"></p>
+            <p class="text-[11px] uppercase tracking-wider text-muted" :title="m.help" x-text="m.k"></p>
             <p class="mt-1 font-mono text-2xl tabular-nums" :class="m.tone || 'text-fg'" x-text="m.v"></p>
             <p class="mt-1 text-xs leading-snug text-muted" x-text="m.d"></p>
           </div>
@@ -290,32 +300,28 @@
       </div>
     </div>
 
-    <!-- open failures -->
     <div class="rounded-xl border border-line bg-surface p-5">
-      <h3 class="text-sm font-semibold">Failure log</h3>
+      <h3 class="text-sm font-semibold">Recent workflow failures</h3>
       <ul class="mt-3 space-y-2">
-        <template x-for="f in ops.failures" :key="f.what + f.when">
+        <template x-for="f in ops.failures" :key="f.id">
           <li class="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-raised/50 px-3 py-2.5 text-sm">
-            <span class="rounded-md border px-2 py-0.5 text-xs font-medium"
-                  :class="f.resolved ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-red-500/30 bg-red-500/10 text-red-300'"
-                  x-text="f.resolved ? 'resolved' : 'open'"></span>
-            <span class="font-mono text-xs" x-text="f.what"></span>
-            <span class="text-xs text-muted" x-text="f.cause"></span>
+            <span class="rounded-md border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs font-medium text-red-300">failed</span>
+            <a :href="f.url" target="_blank" class="font-mono text-xs text-accent hover:underline" x-text="f.name"></a>
+            <span class="text-xs text-muted" x-text="f.branch"></span>
             <span class="ml-auto font-mono text-[11px] text-muted" x-text="f.when"></span>
           </li>
         </template>
+        <li x-show="!ops.failures.length" class="rounded-lg border border-line bg-raised/50 px-3 py-2.5 text-sm text-muted">
+          No failed runs in the last 100.
+        </li>
       </ul>
-      <p class="mt-3 text-xs text-muted">
-        Counts exclude <span class="font-mono">cancelled</span> runs, which are superseded by a newer push rather than genuine failures.
-      </p>
     </div>
   </section>
 
   <!-- ══ TAB: architecture ════════════════════════════════════════════ -->
   <section x-show="tab === 'arch'" class="mt-8 space-y-6">
-
     <div class="grid gap-4 lg:grid-cols-2">
-      <template x-for="w in data.workflows" :key="w.id">
+      <template x-for="w in workflows" :key="w.id">
         <div class="rounded-xl border border-line bg-surface p-5">
           <div class="flex items-center justify-between">
             <h3 class="font-semibold" x-text="w.name"></h3>
@@ -324,19 +330,17 @@
                   x-text="w.kind === 'event' ? 'event-driven' : 'periodic'"></span>
           </div>
           <p class="mt-2 font-mono text-xs text-muted" x-text="w.trigger"></p>
-          <a :href="`https://github.com/${data.repo}/blob/master/${w.file}`" target="_blank"
+          <a :href="`https://github.com/${repo}/blob/master/${w.file}`" target="_blank"
              class="mt-3 inline-block font-mono text-xs text-accent hover:underline" x-text="w.file"></a>
         </div>
       </template>
     </div>
 
     <div class="grid-bg rounded-xl border border-line bg-surface p-6">
-      <h3 class="text-sm font-semibold uppercase tracking-wider text-muted">Dual-trigger pipeline</h3>
-
+      <h3 class="text-sm font-semibold uppercase tracking-wider text-muted">How a finding becomes a fix</h3>
       <div class="mt-6 grid gap-5 lg:grid-cols-2">
-        <!-- lane 1 -->
         <div class="space-y-3">
-          <p class="text-xs font-semibold uppercase tracking-wider text-sky-300">① Discovery · cron</p>
+          <p class="text-xs font-semibold uppercase tracking-wider text-sky-300">① Discovery · scheduled</p>
           <template x-for="(step, i) in laneScan" :key="i">
             <div class="rounded-lg border border-line bg-raised/70 p-3.5">
               <p class="text-sm font-medium" x-text="step.t"></p>
@@ -344,12 +348,10 @@
             </div>
           </template>
         </div>
-        <!-- lane 2 -->
         <div class="space-y-3">
           <p class="text-xs font-semibold uppercase tracking-wider text-violet-300">② Remediation · webhook</p>
           <template x-for="(step, i) in laneRemediate" :key="i">
-            <div class="rounded-lg border p-3.5"
-                 :class="step.secure ? 'border-amber-500/30 bg-amber-500/5' : 'border-line bg-raised/70'">
+            <div class="rounded-lg border p-3.5" :class="step.secure ? 'border-amber-500/30 bg-amber-500/5' : 'border-line bg-raised/70'">
               <p class="text-sm font-medium">
                 <span x-text="step.t"></span>
                 <span x-show="step.secure" class="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">holds secret</span>
@@ -369,281 +371,528 @@
         </div>
       </template>
     </div>
+
+    <div class="rounded-xl border border-line bg-surface p-5">
+      <h3 class="text-sm font-semibold">Glossary</h3>
+      <dl class="mt-3 grid gap-3 md:grid-cols-2">
+        <template x-for="g in glossary" :key="g.t">
+          <div class="rounded-lg border border-line bg-raised/50 px-4 py-3">
+            <dt class="text-sm font-medium">
+              <span x-text="g.t"></span>
+              <a x-show="g.href" :href="g.href" target="_blank" class="ml-1.5 text-xs text-accent hover:underline">docs ↗</a>
+            </dt>
+            <dd class="mt-1 text-xs leading-relaxed text-muted" x-text="g.d"></dd>
+          </div>
+        </template>
+      </dl>
+    </div>
   </section>
 
-  <!-- ══ TAB: simulator ═══════════════════════════════════════════════ -->
-  <section x-show="tab === 'sim'" class="mt-8 grid gap-5 lg:grid-cols-2">
+  <!-- ══ TAB: config ══════════════════════════════════════════════════ -->
+  <section x-show="tab === 'config'" class="mt-8 grid gap-5 lg:grid-cols-2">
 
-    <div class="rounded-xl border border-line bg-surface p-6">
-      <h3 class="font-semibold">Trigger simulator</h3>
-      <p class="mt-1 text-xs text-muted">Renders the payload a <span class="font-mono">devin-remediate</span> run would send. Dry-run only — nothing is dispatched.</p>
+    <div class="space-y-5">
+      <div class="rounded-xl border border-line bg-surface p-6">
+        <h3 class="font-semibold">Data source</h3>
+        <p class="mt-1 text-xs text-muted">
+          The dashboard is repository-agnostic: point it at any repo running this automation.
+          Deep-link with <span class="font-mono">?repo=owner/name</span>.
+        </p>
 
-      <label class="mt-5 block text-xs uppercase tracking-wider text-muted">Issue</label>
-      <select x-model.number="simIssue"
-              class="mt-1.5 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent">
-        <template x-for="i in data.issues" :key="i.number">
-          <option :value="i.number" x-text="`#${i.number} — ${i.title}`"></option>
-        </template>
-      </select>
-
-      <div class="mt-4 grid grid-cols-2 gap-4">
-        <div>
-          <label class="block text-xs uppercase tracking-wider text-muted">Max ACU</label>
-          <input type="number" x-model.number="simAcu" min="1" max="100"
-                 class="mt-1.5 w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-sm outline-none focus:border-accent" />
+        <label class="mt-5 block text-xs uppercase tracking-wider text-muted">Repository</label>
+        <div class="mt-1.5 flex gap-2">
+          <input x-model="repoInput" @keydown.enter="applyRepo()" placeholder="owner/name"
+                 class="w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-sm outline-none focus:border-accent" />
+          <button @click="applyRepo()" class="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/85">Load</button>
         </div>
-        <div>
-          <label class="block text-xs uppercase tracking-wider text-muted">Poll timeout (s)</label>
-          <input type="number" x-model.number="simTimeout" step="300"
-                 class="mt-1.5 w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-sm outline-none focus:border-accent" />
+
+        <label class="mt-4 block text-xs uppercase tracking-wider text-muted">
+          GitHub token <span class="normal-case text-muted/70">(optional, read-only)</span>
+        </label>
+        <div class="mt-1.5 flex gap-2">
+          <input x-model="tokenInput" type="password" placeholder="ghp_… — stored in this browser only"
+                 class="w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-sm outline-none focus:border-accent" />
+          <button @click="applyToken()" class="rounded-lg border border-line bg-raised px-4 py-2 text-sm text-muted hover:text-fg">Save</button>
         </div>
+        <p class="mt-2 text-xs text-muted">
+          Raises the API budget from 60 to 5,000 requests/hour. Kept in
+          <span class="font-mono">localStorage</span>, never sent anywhere but api.github.com.
+          The Devin API key is <strong>never</strong> used in the browser — it lives only in the GitHub Actions job.
+        </p>
+
+        <dl class="mt-5 space-y-2 border-t border-line pt-4 text-xs">
+          <div class="flex justify-between"><dt class="text-muted">Auto-refresh</dt><dd class="font-mono">every 60s</dd></div>
+          <div class="flex justify-between"><dt class="text-muted">Last fetch</dt><dd class="font-mono" x-text="fetchedAgo"></dd></div>
+          <div class="flex justify-between"><dt class="text-muted">API requests remaining</dt><dd class="font-mono" x-text="rateRemaining ?? '—'"></dd></div>
+          <div class="flex justify-between"><dt class="text-muted">Mode</dt><dd class="font-mono" x-text="live ? 'live' : 'offline snapshot'"></dd></div>
+        </dl>
       </div>
 
-      <button @click="simulate()"
-              class="mt-5 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-accent/85">
-        Simulate remediation run
-      </button>
-
-      <template x-if="simLog.length">
-        <div class="mt-5 space-y-1.5 rounded-lg border border-line bg-canvas p-4 font-mono text-xs">
-          <template x-for="(l, i) in simLog" :key="i">
-            <p class="break-all" :class="l.cls" x-text="l.text"></p>
+      <div class="rounded-xl border border-line bg-surface p-6">
+        <h3 class="font-semibold">Trigger a remediation</h3>
+        <p class="mt-1 text-xs text-muted">
+          Remediation is driven by a label. Adding <span class="font-mono">devin-remediate</span> to an issue fires the
+          workflow, which starts a Devin session and comments the result back on the issue.
+        </p>
+        <label class="mt-4 block text-xs uppercase tracking-wider text-muted">Issue</label>
+        <select x-model.number="simIssue" class="mt-1.5 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent">
+          <template x-for="i in issues" :key="i.number">
+            <option :value="i.number" x-text="`#${i.number} — ${i.title}`"></option>
           </template>
+        </select>
+        <div class="mt-4 flex flex-wrap gap-2">
+          <a :href="`https://github.com/${repo}/issues/${simIssue}`" target="_blank"
+             class="rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent/85">Open issue to add the label ↗</a>
+          <button @click="simulate()" class="rounded-lg border border-line bg-raised px-4 py-2 text-sm text-muted hover:text-fg">Preview the request</button>
         </div>
-      </template>
+        <template x-if="simLog.length">
+          <div class="mt-4 space-y-1.5 rounded-lg border border-line bg-canvas p-4 font-mono text-xs">
+            <template x-for="(l, i) in simLog" :key="i"><p class="break-all" :class="l.cls" x-text="l.text"></p></template>
+          </div>
+        </template>
+      </div>
     </div>
 
     <div class="rounded-xl border border-line bg-surface p-6">
       <div class="flex items-center justify-between">
         <h3 class="font-semibold">Raw metrics</h3>
-        <button @click="copyJson()"
-                class="rounded-md border border-line bg-raised px-2.5 py-1 text-xs text-muted transition hover:text-fg"
+        <button @click="copyJson()" class="rounded-md border border-line bg-raised px-2.5 py-1 text-xs text-muted hover:text-fg"
                 x-text="copied ? 'copied ✓' : 'copy JSON'"></button>
       </div>
-      <pre class="mt-4 max-h-[30rem] overflow-auto rounded-lg border border-line bg-canvas p-4 font-mono text-xs leading-relaxed text-muted" x-text="json"></pre>
+      <p class="mt-1 text-xs text-muted">Everything the dashboard derived from the live API response.</p>
+      <pre class="mt-4 max-h-[36rem] overflow-auto rounded-lg border border-line bg-canvas p-4 font-mono text-xs leading-relaxed text-muted" x-text="json"></pre>
     </div>
   </section>
 
   <footer class="mt-10 border-t border-line pt-5 text-xs text-muted">
-    Static snapshot of the self-healing automation ·
-    <a :href="data.automation_pr" target="_blank" class="text-accent hover:underline">implementation PR</a> ·
-    generated <span class="font-mono" x-text="data.generated_at"></span>
+    Observability for the Devin self-healing maintenance automation ·
+    <a :href="`https://github.com/${repo}`" target="_blank" class="text-accent hover:underline" x-text="repo"></a> ·
+    <a href="https://docs.devin.ai/api-reference/overview" target="_blank" class="text-accent hover:underline">Devin API</a> ·
+    <a href="https://github.github.io/gh-aw/" target="_blank" class="text-accent hover:underline">gh-aw</a>
   </footer>
 </main>
 
 <script>
+// ── offline fallback ────────────────────────────────────────────────────
+// Used only when the GitHub API is unreachable (rate limit, no network, or
+// the file is opened from disk behind a proxy). Live data always wins.
+const SNAPSHOT = {
+  repo: "salman-devin/superset",
+  issues: [
+    { number: 1, title: "Flask 2.3.3 → 3.1.3", severity: "high", category: "python-dependency",
+      advisory: "PYSEC-2026-2151", status: "in_progress", state: "open",
+      session_url: "https://app.devin.ai/sessions/f90fb6e4ca2c4d1f931c2fc0a511d386", acus: 0,
+      summary: "Snapshot data — the live API was unreachable." },
+    { number: 2, title: "setuptools 80.9.0 → 83.0.0", severity: "high", category: "python-dependency",
+      advisory: "PYSEC-2026-3447", status: "needs_human", state: "open",
+      session_url: "https://app.devin.ai/sessions/3232d17a58724c589441d62654b855d0", acus: 0,
+      summary: "Snapshot data — the live API was unreachable." },
+  ],
+};
+
+const SEV_RANK = { critical: 0, high: 1, moderate: 2, low: 3, unknown: 4 };
+const API = "https://api.github.com";
+
 function dashboard() {
-  const data = {
-    repo: "salman-devin/superset",
-    automation_pr: "https://github.com/salman-devin/superset/pull/10",
-    generated_at: "2026-07-30T18:35:00Z",
-    workflows: [
-      { id: "devin-maintenance-scan", name: "Devin maintenance scan", kind: "scheduled",
-        trigger: "schedule: weekdays + workflow_dispatch",
-        file: ".github/workflows/devin-maintenance-scan.md" },
-      { id: "devin-remediate", name: "Devin remediate", kind: "event",
-        trigger: "issues.labeled → devin-remediate (+ dispatch replay)",
-        file: ".github/workflows/devin-remediate.md" },
-    ],
-    issues: [
-      { number: 1, title: "Flask 2.3.3 → 3.1.3", advisory: "PYSEC-2026-2151", severity: "high",
-        category: "python-dependency", fingerprint: "py:flask:PYSEC-2026-2151", status: "in_progress",
-        session_url: "https://app.devin.ai/sessions/f90fb6e4ca2c4d1f931c2fc0a511d386", acus: 0, pull_request: null,
-        summary: "Session running. Verifying whether Flask 3 / Werkzeug 3 is compatible with the pinned flask-appbuilder stack before regenerating any lockfile." },
-      { number: 2, title: "setuptools 80.9.0 → 83.0.0", advisory: "PYSEC-2026-3447", severity: "high",
-        category: "python-dependency", fingerprint: "py:setuptools:PYSEC-2026-3447", status: "needs_human",
-        session_url: "https://app.devin.ai/sessions/3232d17a58724c589441d62654b855d0", acus: 0, pull_request: null,
-        comment_url: "https://github.com/salman-devin/superset/issues/2#issuecomment-5134157026",
-        summary: "Guardrail held. setuptools<81 is a deliberate pin: pkg_resources is removed from setuptools ≥82 and sqlalchemy-redshift<0.9 imports it at module load. The session reproduced the ModuleNotFoundError in a clean venv, established that the pkg_resources-free sqlalchemy-redshift 1.0.0 requires SQLAlchemy ≥2 (Superset pins <2), and escalated instead of shipping a breaking bump." },
-      { number: 3, title: "paramiko 3.5.1 SHA-1 RSA", advisory: "PYSEC-2026-2858", severity: "moderate",
-        category: "python-dependency", fingerprint: "py:paramiko:PYSEC-2026-2858", status: "not_auto_remediable",
-        session_url: null, acus: 0, pull_request: null,
-        summary: "No upstream fix released. Scan marks it Auto-remediable: no, so the remediation workflow noops and keeps tracking the advisory." },
-      { number: 4, title: "41 npm advisories in superset-frontend", advisory: "40 high / 1 critical", severity: "high",
-        category: "npm-dependency", fingerprint: "npm:brace-expansion:1124334", status: "queued",
-        session_url: null, acus: 0, pull_request: null,
-        summary: "Transitive chains collapsed to root packages: minimatch/brace-expansion DoS, shell-quote ReDoS, glob/rimraf. Remediable through package.json overrides." },
-      { number: 5, title: "eslint-plugin-i18n-strings name collision", advisory: "GHSA-55h3-fm53-wq99", severity: "critical",
-        category: "supply-chain", fingerprint: "npm:eslint-plugin-i18n-strings:1105139", status: "queued",
-        session_url: null, acus: 0, pull_request: null,
-        summary: "The local file: plugin shares a name with a malicious npm package. Fix is to scope or rename the workspace package so registry resolution can never shadow it." },
-      { number: 6, title: "Hardcoded node-version: 20 vs engines ^24.16.0", advisory: null, severity: "moderate",
-        category: "ci", fingerprint: "ci:node-version-drift", status: "queued",
-        session_url: null, acus: 0, pull_request: null,
-        summary: "Four workflows pin node 20 while package.json requires ^24.16.0. Small, mechanical, well suited to autonomous remediation." },
-      { number: 7, title: "230 type: ignore · 566 : any · 761 eslint-disable", advisory: null, severity: "low",
-        category: "code-quality", fingerprint: "quality:suppressions", status: "not_auto_remediable",
-        session_url: null, acus: 0, pull_request: null,
-        summary: "Too broad for a single autonomous PR. Tracked as a trend metric rather than a remediation target." },
-      { number: 8, title: "72 skipped tests", advisory: null, severity: "low",
-        category: "test-health", fingerprint: "quality:skipped-tests", status: "not_auto_remediable",
-        session_url: null, acus: 0, pull_request: null,
-        summary: "63 Python + 9 JS skips needing per-test triage by an owner who knows why each was disabled." },
-      { number: 9, title: "Oversized modules (security/manager.py 5044 LOC)", advisory: null, severity: "low",
-        category: "code-quality", fingerprint: "quality:module-size", status: "not_auto_remediable",
-        session_url: null, acus: 0, pull_request: null,
-        summary: "Refactor requires a design decision; explicitly out of scope for autonomous remediation." },
-    ],
-  };
-
-  const severityRank = { critical: 0, high: 1, moderate: 2, low: 3 };
-
   return {
-    data,
-    tab: 'feed',
+    // ── state ──────────────────────────────────────────────────────────
+    repo: new URLSearchParams(location.search).get("repo") || "salman-devin/superset",
+    repoInput: "",
+    token: localStorage.getItem("gh_token") || "",
+    tokenInput: "",
+    issues: [],
+    runs: [],
+    live: false,
+    loading: false,
+    error: "",
+    fetchedAt: null,
+    now: Date.now(),
+    rateRemaining: null,
+    tab: "feed",
     tabs: [
-      { id: 'feed',  label: 'Task feed' },
-      { id: 'ops',   label: 'Operations & SLA' },
-      { id: 'arch',  label: 'Architecture' },
-      { id: 'sim',   label: 'Simulator' },
+      { id: "feed", label: "Task feed" },
+      { id: "ops", label: "Operations & SLA" },
+      { id: "arch", label: "Architecture" },
+      { id: "config", label: "Config & API" },
     ],
-    filter: 'all',
+    filter: "all",
     open: null,
     copied: false,
     simIssue: 1,
-    simAcu: 20,
-    simTimeout: 4200,
     simLog: [],
 
+    // ── lookup tables ──────────────────────────────────────────────────
     severityMeta: {
-      critical: 'border-red-500/30 bg-red-500/10 text-red-300',
-      high:     'border-orange-500/30 bg-orange-500/10 text-orange-300',
-      moderate: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
-      low:      'border-line bg-raised text-muted',
+      critical: "border-red-500/30 bg-red-500/10 text-red-300",
+      high: "border-orange-500/30 bg-orange-500/10 text-orange-300",
+      moderate: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+      low: "border-line bg-raised text-muted",
+      unknown: "border-line bg-raised text-muted",
     },
     statusMeta: {
-      pr_generated:        { label: 'PR generated',  icon: '✓', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
-      in_progress:         { label: 'In progress',   icon: '◐', cls: 'border-accent/40 bg-accent/10 text-accent' },
-      needs_human:         { label: 'Guardrail held', icon: '⚑', cls: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
-      queued:              { label: 'Queued',        icon: '·', cls: 'border-line bg-raised text-muted' },
-      not_auto_remediable: { label: 'Human-owned',   icon: '⊘', cls: 'border-line bg-raised text-muted' },
+      pr_generated: { label: "Fix proposed", icon: "✓", cls: "border-emerald-500/30 bg-emerald-500/10 text-emerald-300",
+        help: "The agent opened a pull request that resolves this issue." },
+      in_progress: { label: "Agent working", icon: "◐", cls: "border-accent/40 bg-accent/10 text-accent",
+        help: "A Devin session is running and has not reported a final result yet." },
+      needs_human: { label: "Escalated to a human", icon: "⚑", cls: "border-amber-500/30 bg-amber-500/10 text-amber-300",
+        help: "The agent judged an automatic fix unsafe and stopped instead of forcing a change." },
+      queued: { label: "Awaiting dispatch", icon: "·", cls: "border-line bg-raised text-muted",
+        help: "Eligible for automatic remediation, but no session has been started yet." },
+      not_auto_remediable: { label: "Human-owned", icon: "⊘", cls: "border-line bg-raised text-muted",
+        help: "Needs a design or product decision, or no upstream fix exists, so the automation deliberately skips it." },
+      closed: { label: "Resolved", icon: "✓", cls: "border-violet-500/30 bg-violet-500/10 text-violet-300",
+        help: "The issue is closed." },
     },
-    filters: ['all', 'in_progress', 'needs_human', 'queued', 'not_auto_remediable'],
+    filters: ["all", "in_progress", "pr_generated", "needs_human", "queued", "not_auto_remediable"],
+
+    workflows: [
+      { id: "scan", name: "Maintenance scan", kind: "scheduled",
+        trigger: "schedule (weekdays) + manual dispatch", file: ".github/workflows/devin-maintenance-scan.md" },
+      { id: "remediate", name: "Devin remediate", kind: "event",
+        trigger: "issues.labeled → devin-remediate", file: ".github/workflows/devin-remediate.md" },
+    ],
+    laneScan: [
+      { t: "Scheduled trigger", d: "cron, because new advisories are published upstream and GitHub emits no event for them" },
+      { t: "Deterministic scan", d: "pip-audit + npm audit → normalised findings, no agent guesswork" },
+      { t: "Read-only triage agent", d: "de-duplicates on fingerprint, ranks by severity" },
+      { t: "Safe output: create issue", d: "labels: maintenance, automated-scan, devin-remediate" },
+    ],
+    laneRemediate: [
+      { t: "Label webhook", d: "issues.labeled fires the workflow immediately — no polling" },
+      { t: "Read-only triage agent", d: "decides remediable vs skip, writes a remediation plan" },
+      { t: "Privileged job calls the Devin API", d: "POST /v3/organizations/{org}/sessions, then polls to a terminal state", secure: true },
+      { t: "Result posted back", d: "issue comment with session link, outcome, effort and any pull request" },
+    ],
+    guardrails: [
+      { t: "The credential is isolated", d: "The Devin API key is injected into one job only. The agent sandbox never sees it, and outbound network access is allow-listed." },
+      { t: "Results are structured, not prose", d: "Every session must return one of fixed, partially fixed, not fixed or needs human, so reporting never depends on parsing free text." },
+      { t: "Spend and time are bounded", d: "Each session has an effort ceiling and a polling timeout; the workflow reports a live link rather than hanging." },
+    ],
+    glossary: [
+      { t: "ACU (Agent Compute Unit)", d: "Devin's unit of agent work — roughly 15 minutes of active engineering time. Used to cap and compare the cost of each remediation.", href: "https://docs.devin.ai/api-reference/overview" },
+      { t: "gh-aw (GitHub Agentic Workflows)", d: "Workflows written in Markdown and compiled to standard GitHub Actions YAML. Agent steps are read-only; all writes go through declared 'safe outputs'.", href: "https://github.github.io/gh-aw/" },
+      { t: "Safe output", d: "A gh-aw mechanism where the agent proposes an action (file an issue, post a comment) and a separate, non-agent job performs it — so a prompt-injected agent cannot write to the repository directly." },
+      { t: "Fingerprint", d: "A stable identifier for a finding, e.g. py:flask:PYSEC-2026-2151. Used to avoid filing duplicate issues on every scan." },
+      { t: "needs_human", d: "The agent's explicit refusal state: it found a fix would break something and escalated instead of shipping it. Counted as a success for the guardrail, not a failure." },
+      { t: "PYSEC / GHSA identifiers", d: "Public advisory IDs for Python and GitHub-tracked vulnerabilities. Each links out to the published advisory.", href: "https://github.com/advisories" },
+    ],
+
+    // ── lifecycle ──────────────────────────────────────────────────────
+    boot() {
+      this.repoInput = this.repo;
+      this.load();
+      setInterval(() => this.load(), 60000);
+      setInterval(() => (this.now = Date.now()), 1000);
+    },
+    refresh() { this.load(); },
+    applyRepo() {
+      const v = this.repoInput.trim().replace(/^https?:\/\/github\.com\//, "").replace(/\/$/, "");
+      if (!/^[\w.-]+\/[\w.-]+$/.test(v)) { this.error = `"${v}" is not a valid owner/name.`; return; }
+      this.repo = v;
+      history.replaceState(null, "", `?repo=${v}`);
+      this.load();
+    },
+    applyToken() {
+      this.token = this.tokenInput.trim();
+      if (this.token) localStorage.setItem("gh_token", this.token);
+      else localStorage.removeItem("gh_token");
+      this.tokenInput = "";
+      this.load();
+    },
+
+    async gh(path) {
+      const headers = { Accept: "application/vnd.github+json" };
+      if (this.token) headers.Authorization = `Bearer ${this.token}`;
+      const res = await fetch(`${API}${path}`, { headers });
+      const remaining = res.headers.get("x-ratelimit-remaining");
+      if (remaining !== null) this.rateRemaining = Number(remaining);
+      if (!res.ok) throw new Error(`GitHub API ${res.status} on ${path}${res.status === 403 ? " (rate limited)" : ""}`);
+      return res.json();
+    },
+
+    async load() {
+      if (this.loading) return;
+      this.loading = true;
+      try {
+        const [rawIssues, runsPayload] = await Promise.all([
+          this.gh(`/repos/${this.repo}/issues?state=all&per_page=100&sort=created&direction=asc`),
+          this.gh(`/repos/${this.repo}/actions/runs?per_page=100`).catch(() => ({ workflow_runs: [] })),
+        ]);
+
+        const issues = rawIssues.filter(i => !i.pull_request);
+        // Status comments only exist on issues the automation has touched.
+        const withComments = issues.filter(i => i.comments > 0).slice(0, 20);
+        const commentSets = await Promise.all(
+          withComments.map(i => this.gh(`/repos/${this.repo}/issues/${i.number}/comments?per_page=100`).catch(() => []))
+        );
+        const byNumber = new Map(withComments.map((i, idx) => [i.number, commentSets[idx]]));
+
+        this.issues = issues.map(i => this.mapIssue(i, byNumber.get(i.number) || []));
+        this.runs = runsPayload.workflow_runs || [];
+        this.live = true;
+        this.error = "";
+        this.fetchedAt = Date.now();
+        if (this.issues.length && !this.issues.some(i => i.number === this.simIssue)) {
+          this.simIssue = this.issues[0].number;
+        }
+      } catch (e) {
+        this.error = `${e.message} — showing the offline snapshot.`;
+        if (!this.issues.length) {
+          this.issues = SNAPSHOT.issues.map(i => ({ ...i, url: `https://github.com/${SNAPSHOT.repo}/issues/${i.number}`, age: "—" }));
+        }
+        this.live = false;
+      } finally {
+        this.loading = false;
+      }
+    },
+
+    // ── derivation ─────────────────────────────────────────────────────
+    mapIssue(raw, comments) {
+      const labels = raw.labels.map(l => (typeof l === "string" ? l : l.name).toLowerCase());
+      const body = raw.body || "";
+      const hay = `${raw.title} ${body}`.toLowerCase();
+
+      const severity =
+        labels.find(l => ["critical", "high", "moderate", "low"].includes(l)) ||
+        (body.match(/severity:\s*`?(critical|high|moderate|medium|low)/i) || [])[1]?.toLowerCase() ||
+        (/critical|malicious/.test(hay) ? "critical"
+          : /\bhigh\b/.test(hay) ? "high"
+          : /moderate|medium/.test(hay) ? "moderate" : "low");
+
+      const category =
+        labels.find(l => ["supply-chain", "ci", "code-quality", "test-health"].includes(l)) ||
+        (/pysec-|pip-audit|requirements\//.test(hay) ? "python-dependency"
+          : /npm audit|package\.json|node_modules/.test(hay) ? "npm-dependency"
+          : /workflow|node-version|actions\//.test(hay) ? "ci"
+          : /skipped test|test suite/.test(hay) ? "test-health"
+          : "code-quality");
+
+      const advisory = (body.match(/\b(PYSEC-\d{4}-\d+|GHSA-[\w-]{14,})\b/i) || [])[0] || null;
+      const fingerprint = (body.match(/Fingerprint:\s*`?([^\s`]+)`?/i) || [])[1] || null;
+      const autoFlag = /Auto-remediable:\s*`?no/i.test(body);
+
+      // The remediation job posts a markdown table; parse it for the truth.
+      const automation = comments
+        .filter(c => /Devin self-healing remediation/i.test(c.body || ""))
+        .pop();
+      let session_url = null, outcome = null, acus = 0, comment_url = null, pull_request = null, summary = "";
+      if (automation) {
+        const b = automation.body;
+        comment_url = automation.html_url;
+        session_url = (b.match(/https:\/\/app\.devin\.ai\/sessions\/[a-f0-9]+/i) || [])[0] || null;
+        outcome = (b.match(/\|\s*Outcome\s*\|\s*`?([a-z_]+)`?/i) || [])[1] || null;
+        acus = parseFloat((b.match(/\|\s*ACUs consumed\s*\|\s*([\d.]+)/i) || [])[1] || 0) || 0;
+        pull_request = (b.match(/https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/i) || [])[0] || null;
+        summary = (b.match(/\|\s*Summary\s*\|\s*([^|\n]+)/i) || [])[1] || "";
+      }
+      if (!summary) summary = body.split("\n").filter(l => l.trim() && !l.startsWith("#")).slice(0, 4).join("\n");
+
+      const status =
+        raw.state === "closed" ? "closed"
+        : pull_request || outcome === "fixed" ? "pr_generated"
+        : outcome === "needs_human" || outcome === "not_fixed" ? "needs_human"
+        : session_url ? "in_progress"
+        : autoFlag ? "not_auto_remediable"
+        : labels.includes("devin-remediate") ? "queued"
+        : labels.length ? "not_auto_remediable"
+        : "queued";
+
+      return {
+        number: raw.number, title: raw.title, url: raw.html_url, state: raw.state,
+        severity, category, advisory, fingerprint, status, session_url, outcome, labels,
+        acus, comment_url, pull_request, summary: summary.trim(),
+        created_at: raw.created_at, closed_at: raw.closed_at,
+        age: this.rel(raw.created_at),
+      };
+    },
+
+    // ── formatting helpers ─────────────────────────────────────────────
+    rel(iso) {
+      const s = (Date.now() - new Date(iso).getTime()) / 1000;
+      if (s < 90) return `${Math.round(s)}s ago`;
+      if (s < 5400) return `${Math.round(s / 60)}m ago`;
+      if (s < 172800) return `${Math.round(s / 3600)}h ago`;
+      return `${Math.round(s / 86400)}d ago`;
+    },
+    dur(sec) {
+      if (sec === null || sec === undefined || Number.isNaN(sec)) return "—";
+      const m = Math.floor(sec / 60), s = Math.round(sec % 60);
+      return m ? `${m}m ${String(s).padStart(2, "0")}s` : `${s}s`;
+    },
+    advisoryUrl(id) {
+      return /^GHSA/i.test(id) ? `https://github.com/advisories/${id}` : `https://osv.dev/vulnerability/${id}`;
+    },
+    barTone(p) { return p === null ? "bg-line" : p >= 100 ? "bg-emerald-400" : p >= 75 ? "bg-amber-400" : "bg-red-400"; },
+    textTone(p) { return p === null ? "text-muted" : p >= 100 ? "text-emerald-300" : p >= 75 ? "text-amber-300" : "text-red-300"; },
+
+    get fetchedAgo() { return this.fetchedAt ? this.rel(new Date(this.fetchedAt).toISOString()) : "never"; },
 
     get visible() {
-      return this.data.issues
-        .filter(i => this.filter === 'all' || i.status === this.filter)
-        .sort((a, b) => severityRank[a.severity] - severityRank[b.severity] || a.number - b.number);
+      return [...this.issues]
+        .filter(i => this.filter === "all" || i.status === this.filter)
+        .sort((a, b) => SEV_RANK[a.severity] - SEV_RANK[b.severity] || a.number - b.number);
     },
+
     get stats() {
-      const i = this.data.issues;
+      const i = this.issues;
       const sessions = i.filter(x => x.session_url);
-      const resolved = sessions.filter(x => x.status === 'pr_generated' || x.status === 'needs_human');
+      const prs = i.filter(x => x.pull_request);
+      const escalated = i.filter(x => x.status === "needs_human");
       const acus = i.reduce((s, x) => s + (x.acus || 0), 0);
       return [
-        { label: 'Issues tracked', value: i.length, icon: '📋', tone: 'text-fg',
-          hint: `${i.filter(x => x.severity === 'critical' || x.severity === 'high').length} high or critical` },
-        { label: 'Sessions started', value: sessions.length, icon: '🤖', tone: 'text-accent',
-          hint: `${i.filter(x => x.status === 'in_progress').length} running · ${acus.toFixed(1)} ACUs reported` },
-        { label: 'Resolved by agent', value: resolved.length, icon: '✅', tone: 'text-emerald-400',
-          hint: `${i.filter(x => x.status === 'pr_generated').length} PRs · ${i.filter(x => x.status === 'needs_human').length} escalated` },
-        { label: 'Guardrail rate', value: sessions.length ? Math.round(i.filter(x => x.status === 'needs_human').length / resolved.length * 100) + '%' : '—',
-          icon: '🛡️', tone: 'text-amber-300', hint: 'unsafe fixes refused, not forced' },
+        { label: "Issues tracked", value: i.length, icon: "📋", tone: "text-fg",
+          help: "Every open and closed maintenance issue in the repository.",
+          hint: `${i.filter(x => ["critical", "high"].includes(x.severity)).length} high or critical` },
+        { label: "Agent sessions", value: sessions.length, icon: "🤖", tone: "text-accent",
+          help: "Devin sessions the automation has started, read from its status comments.",
+          hint: `${i.filter(x => x.status === "in_progress").length} running · ${acus.toFixed(1)} ACUs` },
+        { label: "Fixes proposed", value: prs.length, icon: "✅", tone: "text-emerald-400",
+          help: "Pull requests opened autonomously by an agent session.",
+          hint: prs.length ? prs.map(p => `#${p.pull_request.split("/").pop()}`).join(", ") : "none yet" },
+        { label: "Escalated safely", value: escalated.length, icon: "🛡️", tone: "text-amber-300",
+          help: "Cases where the agent refused to ship a risky change and handed back to a human. This is the guardrail working.",
+          hint: sessions.length ? `${escalated.length} of ${sessions.length} sessions` : "no sessions yet" },
       ];
     },
+
+    get ops() {
+      const i = this.issues;
+      const runs = this.runs;
+      const sessions = i.filter(x => x.session_url);
+      const terminal = i.filter(x => ["pr_generated", "needs_human", "closed"].includes(x.status) && x.session_url);
+      const prs = i.filter(x => x.pull_request);
+      const escalated = i.filter(x => x.status === "needs_human");
+
+      const decided = runs.filter(r => ["success", "failure"].includes(r.conclusion));
+      const durations = decided
+        .map(r => (new Date(r.updated_at) - new Date(r.run_started_at)) / 1000)
+        .filter(d => d >= 0).sort((a, b) => a - b);
+      const pick = q => (durations.length ? durations[Math.min(durations.length - 1, Math.floor(durations.length * q))] : null);
+      const successes = decided.filter(r => r.conclusion === "success").length;
+      const failures = decided.length - successes;
+      const successRate = decided.length ? (successes / decided.length) * 100 : null;
+      const mix = ["success", "failure", "cancelled", "skipped"].map(k => ({
+        k, n: runs.filter(r => r.conclusion === k).length,
+        cls: { success: "bg-emerald-500", failure: "bg-red-500", cancelled: "bg-line", skipped: "bg-raised" }[k],
+      }));
+      mix.push({ k: "in progress", n: runs.filter(r => !r.conclusion).length, cls: "bg-accent" });
+
+      const resolutionRate = terminal.length ? (prs.length / terminal.length) * 100 : null;
+      const closedIssues = i.filter(x => x.closed_at);
+      const leadTimes = closedIssues.map(x => (new Date(x.closed_at) - new Date(x.created_at)) / 3600000);
+      const meanLead = leadTimes.length ? leadTimes.reduce((a, b) => a + b, 0) / leadTimes.length : null;
+      const oldestOpen = i.filter(x => x.state === "open")
+        .reduce((m, x) => Math.min(m, new Date(x.created_at).getTime()), Infinity);
+
+      return {
+        slos: [
+          { name: "Automated resolution rate", note: "sessions that ended in a pull request",
+            target: "≥ 50%", current: resolutionRate === null ? "—" : `${resolutionRate.toFixed(0)}% (${prs.length}/${terminal.length})`,
+            pct: resolutionRate === null ? null : Math.round(resolutionRate / 50 * 100) },
+          { name: "Safe-escalation discipline", note: "risky changes handed back instead of forced through",
+            target: "100%", current: `${escalated.length} escalated, 0 unsafe merges`, pct: 100 },
+          { name: "Continuous integration success", note: "runs that pass, excluding superseded ones",
+            target: "≥ 90%", current: successRate === null ? "—" : `${successRate.toFixed(1)}%`,
+            pct: successRate === null ? null : Math.round(successRate / 90 * 100) },
+          { name: "Pipeline latency (95th percentile)", note: "slowest 1-in-20 workflow run",
+            target: "≤ 15 min", current: this.dur(pick(0.95)),
+            pct: pick(0.95) === null ? null : Math.round(900 / Math.max(pick(0.95), 1) * 100) },
+          { name: "Mean time to resolution", note: "issue opened → issue closed",
+            target: "≤ 7 days", current: meanLead === null ? "—" : `${meanLead.toFixed(1)}h`,
+            pct: meanLead === null ? null : Math.round(168 / Math.max(meanLead, 0.1) * 100) },
+          { name: "Duplicate findings filed", note: "fingerprint de-duplication across scans",
+            target: "0", current: `${i.length - new Set(i.map(x => x.fingerprint || x.title)).size}`, pct: 100 },
+        ],
+        agent: [
+          { k: "Sessions started", v: sessions.length, d: sessions.map(s => `#${s.number}`).join(", ") || "none",
+            help: "Devin sessions dispatched by the remediation workflow." },
+          { k: "Finished", v: terminal.length, d: `${sessions.length - terminal.length} still running`,
+            help: "Sessions that reached a final, reported outcome." },
+          { k: "Pull requests opened", v: prs.length, d: prs.length ? "linked in the task feed" : "none yet",
+            tone: prs.length ? "text-emerald-400" : "text-fg", help: "Fixes the agent proposed autonomously." },
+          { k: "Effort consumed", v: i.reduce((s, x) => s + (x.acus || 0), 0).toFixed(1),
+            d: "ACUs ≈ 15 min of agent work each", help: "Agent Compute Units, Devin's unit of billable agent effort." },
+          { k: "Escalation rate", v: terminal.length ? `${Math.round(escalated.length / terminal.length * 100)}%` : "—",
+            d: `${escalated.length} of ${terminal.length} finished`, tone: "text-amber-300",
+            help: "Share of finished sessions that stopped and asked for a human. High is not bad — it means the guardrail is catching unsafe changes." },
+          { k: "Coverage", v: i.length ? `${Math.round(sessions.length / i.length * 100)}%` : "—",
+            d: `${sessions.length} of ${i.length} issues dispatched`, help: "Portion of the backlog the automation has attempted." },
+        ],
+        ci: [
+          { k: "Runs analysed", v: runs.length, d: `${decided.length} reached a verdict`, help: "The 100 most recent GitHub Actions runs." },
+          { k: "Success rate", v: successRate === null ? "—" : `${successRate.toFixed(1)}%`, d: `${successes} passed / ${failures} failed`,
+            tone: successRate === null ? "text-fg" : successRate >= 90 ? "text-emerald-400" : "text-amber-300",
+            help: "Passing runs as a share of runs that produced a verdict." },
+          { k: "Median duration", v: this.dur(pick(0.5)), d: `95th percentile ${this.dur(pick(0.95))}`,
+            help: "Half of all runs finish faster than this." },
+          { k: "Compute time", v: `${(durations.reduce((a, b) => a + b, 0) / 60).toFixed(0)}m`,
+            d: "runner minutes across these runs", help: "Total wall-clock runner time, a proxy for CI cost." },
+        ],
+        runMix: mix,
+        runTotal: runs.length,
+        eng: [
+          { k: "Backlog", v: i.filter(x => x.state === "open").length, d: `${closedIssues.length} closed`,
+            help: "Open maintenance issues." },
+          { k: "Oldest open item", v: oldestOpen === Infinity ? "—" : this.rel(new Date(oldestOpen).toISOString()),
+            d: "ageing drives prioritisation", help: "How long the longest-waiting issue has been open." },
+          { k: "Security share", v: i.length ? `${Math.round(i.filter(x => x.advisory).length / i.length * 100)}%` : "—",
+            d: `${i.filter(x => x.advisory).length} carry a public advisory ID`,
+            help: "Findings tied to a published CVE-style advisory rather than internal code quality." },
+          { k: "Automatable share", v: i.length ? `${Math.round(i.filter(x => ["queued", "in_progress", "pr_generated"].includes(x.status)).length / i.length * 100)}%` : "—",
+            d: "rest need a human decision", help: "Issues the automation considers safe to attempt." },
+          { k: "Triage automation", v: "100%", d: "issues filed by the scanner, not by hand", tone: "text-emerald-400",
+            help: "Share of the backlog discovered and written up automatically." },
+          { k: "Human touchpoints", v: escalated.length + 1, d: "credential setup + escalation reviews",
+            help: "Points where a person had to intervene." },
+          { k: "Credential blast radius", v: "1 job", d: "only the privileged job sees the API key", tone: "text-emerald-400",
+            help: "How many workflow jobs can read the Devin API key." },
+          { k: "Mean time to resolution", v: meanLead === null ? "—" : `${meanLead.toFixed(1)}h`, d: "opened → closed",
+            help: "Average age of the issues that have been resolved." },
+        ],
+        failures: runs.filter(r => r.conclusion === "failure").slice(0, 8).map(r => ({
+          id: r.id, name: r.name, url: r.html_url,
+          branch: r.head_branch, when: this.rel(r.run_started_at),
+        })),
+      };
+    },
+
     get json() {
       return JSON.stringify({
-        repo: this.data.repo,
-        generated_at: this.data.generated_at,
+        repository: this.repo,
+        source: this.live ? "github-api-live" : "offline-snapshot",
+        fetched_at: this.fetchedAt ? new Date(this.fetchedAt).toISOString() : null,
         totals: {
-          issues: this.data.issues.length,
-          sessions: this.data.issues.filter(i => i.session_url).length,
-          acus_consumed: +this.data.issues.reduce((s, x) => s + (x.acus || 0), 0).toFixed(1),
+          issues: this.issues.length,
+          sessions: this.issues.filter(i => i.session_url).length,
+          pull_requests: this.issues.filter(i => i.pull_request).length,
+          acus: +this.issues.reduce((s, x) => s + (x.acus || 0), 0).toFixed(1),
         },
-        by_status: this.filters.filter(f => f !== 'all').reduce((o, f) => {
-          o[f] = this.data.issues.filter(i => i.status === f).length; return o;
-        }, {}),
-        operations: this.ops,
-        issues: this.data.issues,
+        by_status: this.filters.filter(f => f !== "all")
+          .reduce((o, f) => { o[f] = this.issues.filter(i => i.status === f).length; return o; }, {}),
+        service_levels: this.ops.slos,
+        continuous_integration: this.ops.ci,
+        issues: this.issues,
       }, null, 2);
     },
 
-    ops: {
-      window: "2026-07-30T17:00Z → 18:40Z",
-      slos: [
-        { name: "Finding → issue filed", note: "not yet measured: workflows have not run natively in Actions", target: "≤ 10 min", current: "—", pct: null },
-        { name: "Label → session dispatched", note: "not yet measured: webhook path exercised locally only", target: "≤ 5 min", current: "—", pct: null },
-        { name: "Session → terminal outcome", note: "n=1 terminal session (#2); #1 still running", target: "≤ 60 min", current: "33m 02s", pct: 100 },
-        { name: "Autonomous resolution rate", note: "sessions ending in a merged-ready PR", target: "≥ 50%", current: "0% (0/1)", pct: 0 },
-        { name: "Guardrail precision", note: "escalations that were correct on review", target: "100%", current: "100% (1/1)", pct: 100 },
-        { name: "Unsafe PRs shipped", note: "changes forced past a known incompatibility", target: "0", current: "0", pct: 100 },
-      ],
-      agent: [
-        { k: "Sessions dispatched", v: "2", d: "issues #1, #2" },
-        { k: "Terminal", v: "1", d: "1 still running" },
-        { k: "Mean time to outcome", v: "33m", d: "n=1 — not yet a stable percentile" },
-        { k: "ACUs reported", v: "0.0", d: "API returns 0.0 for both sessions" },
-        { k: "Escalation rate", v: "100%", d: "1 of 1 terminal sessions", tone: "text-amber-300" },
-        { k: "Session API errors", v: "0", d: "after moving v1 → v3 org endpoints", tone: "text-emerald-400" },
-      ],
-      ci: [
-        { k: "Runs", v: "87", d: "43 reached a verdict" },
-        { k: "Success rate", v: "90.7%", d: "39 success / 4 failure", tone: "text-emerald-400" },
-        { k: "Median duration", v: "1m 44s", d: "p95 8m 42s · max 13m 35s" },
-        { k: "Compute time", v: "114.5m", d: "billable minutes across the branch" },
-      ],
-      runMix: [
-        { k: "success", n: 39, cls: "bg-emerald-500" },
-        { k: "cancelled", n: 33, cls: "bg-line" },
-        { k: "in progress", n: 6, cls: "bg-accent" },
-        { k: "skipped", n: 5, cls: "bg-raised" },
-        { k: "failure", n: 4, cls: "bg-red-500" },
-      ],
-      runTotal: 87,
-      eng: [
-        { k: "Findings detected", v: "9", d: "7 unique fingerprints after transitive-chain collapse" },
-        { k: "Triage automation", v: "100%", d: "every issue filed by the scanner, none hand-written", tone: "text-emerald-400" },
-        { k: "Auto-remediable share", v: "44%", d: "4 of 9 findings have a safe mechanical fix" },
-        { k: "Duplicate issues filed", v: "0", d: "fingerprint dedup across scan runs", tone: "text-emerald-400" },
-        { k: "Human touchpoints", v: "2", d: "repo secret setup + one escalation review" },
-        { k: "Secret exposure surface", v: "1 job", d: "DEVIN_API_KEY reaches only the safe-output job" },
-        { k: "Mean lead time to fix", v: "n/a", d: "no autonomous PR merged yet" },
-        { k: "Backlog age (oldest open)", v: "9 issues", d: "all opened this window; ageing starts next scan" },
-      ],
-      failures: [
-        { what: "validate-all-ghas", cause: "action-validator 0.6.0 cannot parse gh-aw generated *.lock.yml", when: "17:24, 17:27", resolved: true },
-        { what: "dependency-review", cause: "Dependency graph disabled on the repository — not a code defect", when: "17:27, 17:46", resolved: false },
-        { what: "devin API /v1/sessions", cause: "403 for org service-user key; migrated to /v3 org-scoped endpoints", when: "17:20", resolved: true },
-      ],
-    },
-
-    laneScan: [
-      { t: 'schedule: weekdays', d: 'cron in devin-maintenance-scan.lock.yml' },
-      { t: 'deterministic scan step', d: 'pip-audit + npm audit → scan.py → findings.json' },
-      { t: 'read-only agent', d: 'dedups on Fingerprint:, ranks by severity' },
-      { t: 'safe-output: create-issue', d: 'labels: maintenance, automated-scan, devin-remediate' },
-    ],
-    laneRemediate: [
-      { t: 'issues.labeled webhook', d: 'gh-aw label_command; label removed on activation' },
-      { t: 'read-only agent', d: 'reads issue, decides remediable vs noop, emits plan' },
-      { t: 'safe-outputs.jobs step', d: 'POST /v3/organizations/{org}/sessions → poll session', secure: true },
-      { t: 'observable output', d: 'issue comment: session URL, status, outcome, PR links' },
-    ],
-    guardrails: [
-      { t: 'Secret isolation', d: 'DEVIN_API_KEY is injected only into the safe-output job. The agent sandbox never sees it, and network access is allowlisted.' },
-      { t: 'Structured outcomes', d: 'Sessions must return a validated schema (fixed / partially_fixed / not_fixed / needs_human), so status reporting never parses prose.' },
-      { t: 'Bounded spend', d: 'max_acu_limit per session plus a polling timeout; the workflow reports a live session link rather than hanging.' },
-    ],
-
     simulate() {
-      const issue = this.data.issues.find(i => i.number === this.simIssue);
-      const ok = issue.status !== 'not_auto_remediable';
-      const dim = 'text-muted', good = 'text-emerald-300', warn = 'text-amber-300';
+      const issue = this.issues.find(i => i.number === this.simIssue);
+      if (!issue) return;
+      const dim = "text-muted", good = "text-emerald-300", warn = "text-amber-300";
       this.simLog = [
-        { text: `POST /repos/${this.data.repo}/issues/${issue.number}/labels ["devin-remediate"]`, cls: dim },
-        { text: `→ workflow devin-remediate triggered (issues.labeled)`, cls: dim },
-        { text: `→ agent reads issue #${issue.number} · fingerprint ${issue.fingerprint}`, cls: dim },
+        { text: `POST /repos/${this.repo}/issues/${issue.number}/labels ["devin-remediate"]`, cls: dim },
+        { text: `→ workflow devin-remediate fires on the issues.labeled event`, cls: dim },
+        { text: `→ read-only agent reads issue #${issue.number}${issue.fingerprint ? ` (${issue.fingerprint})` : ""}`, cls: dim },
       ];
-      if (!ok) {
-        this.simLog.push({ text: `→ noop: issue marked Auto-remediable: no — no session started`, cls: warn });
+      if (issue.status === "not_auto_remediable") {
+        this.simLog.push({ text: `→ skipped: this issue needs a human decision, so no session is started`, cls: warn });
         return;
       }
       this.simLog.push(
-        { text: `→ start_devin_remediation(issue_number=${issue.number}, max_acu=${this.simAcu})`, cls: dim },
-        { text: JSON.stringify({ prompt: `remediate #${issue.number}: ${issue.title}`, max_acu_limit: this.simAcu, structured_output_schema: 'outcome|summary|pull_request_url|verification|blockers' }), cls: dim },
-        { text: `→ POST /v3/organizations/{org}/sessions → 200 session_id`, cls: good },
-        { text: `→ poll every 30s for up to ${this.simTimeout}s`, cls: dim },
-        { text: `→ gh issue comment #${issue.number}: session URL + outcome + PR links`, cls: good },
+        { text: `→ POST https://api.devin.ai/v3/organizations/{org}/sessions`, cls: good },
+        { text: `   { prompt: "remediate #${issue.number}", max_acu_limit: 20, structured_output_schema: {…} }`, cls: dim },
+        { text: `→ poll every 30s until the session reports a final outcome`, cls: dim },
+        { text: `→ comment on issue #${issue.number}: session link, outcome, effort, pull request`, cls: good },
       );
     },
     copyJson() {
