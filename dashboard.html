@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Devin Self-Heal · salman-devin/superset</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          canvas: '#0a0c10',
+          surface: '#0d1117',
+          raised: '#151b23',
+          line: '#2a313c',
+          muted: '#8b949e',
+          fg: '#e6edf3',
+          accent: '#2f81f7',
+        },
+        fontFamily: {
+          mono: ['ui-monospace', 'SFMono-Regular', 'SF Mono', 'Menlo', 'monospace'],
+        },
+      },
+    },
+  };
+</script>
+<style>
+  html { color-scheme: dark; }
+  body { -webkit-font-smoothing: antialiased; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: #0d1117; }
+  ::-webkit-scrollbar-thumb { background: #2a313c; border-radius: 6px; }
+  ::-webkit-scrollbar-thumb:hover { background: #3d444d; }
+  [x-cloak] { display: none !important; }
+  .grid-bg {
+    background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,.055) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
+  @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(47,129,247,.45); } 70% { box-shadow: 0 0 0 7px rgba(47,129,247,0); } 100% { box-shadow: 0 0 0 0 rgba(47,129,247,0); } }
+  .live-dot { animation: pulse-ring 2s infinite; }
+</style>
+</head>
+
+<body class="bg-canvas text-fg font-sans antialiased" x-data="dashboard()" x-cloak>
+
+<!-- ── header ─────────────────────────────────────────────────────────── -->
+<header class="sticky top-0 z-30 border-b border-line bg-surface/85 backdrop-blur">
+  <div class="mx-auto flex max-w-7xl flex-wrap items-center gap-4 px-6 py-3.5">
+    <div class="flex items-center gap-3">
+      <span class="grid h-9 w-9 place-items-center rounded-lg bg-accent/15 text-lg ring-1 ring-accent/30">🛡️</span>
+      <div class="leading-tight">
+        <h1 class="text-sm font-semibold tracking-tight">Devin Self-Heal</h1>
+        <a class="font-mono text-xs text-muted hover:text-accent" :href="`https://github.com/${data.repo}`" target="_blank" x-text="data.repo"></a>
+      </div>
+    </div>
+
+    <span class="ml-2 inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-300">
+      <span class="live-dot h-1.5 w-1.5 rounded-full bg-emerald-400"></span> Automation armed
+    </span>
+
+    <nav class="ml-auto flex items-center gap-1 text-sm">
+      <template x-for="t in tabs" :key="t.id">
+        <button @click="tab = t.id"
+                class="rounded-md px-3 py-1.5 transition"
+                :class="tab === t.id ? 'bg-raised text-fg ring-1 ring-line' : 'text-muted hover:text-fg'"
+                x-text="t.label"></button>
+      </template>
+      <a :href="data.automation_pr" target="_blank"
+         class="ml-2 rounded-md border border-line bg-raised px-3 py-1.5 text-sm text-muted transition hover:border-accent/50 hover:text-fg">
+        PR&nbsp;#10 ↗
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main class="mx-auto max-w-7xl px-6 py-8">
+
+  <!-- ── stats ────────────────────────────────────────────────────────── -->
+  <section class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <template x-for="s in stats" :key="s.label">
+      <div class="rounded-xl border border-line bg-surface p-5 transition hover:border-line/80 hover:bg-raised/60">
+        <div class="flex items-start justify-between">
+          <p class="text-xs uppercase tracking-wider text-muted" x-text="s.label"></p>
+          <span class="text-base opacity-70" x-text="s.icon"></span>
+        </div>
+        <p class="mt-2 text-3xl font-semibold tabular-nums" :class="s.tone" x-text="s.value"></p>
+        <p class="mt-1 text-xs text-muted" x-text="s.hint"></p>
+      </div>
+    </template>
+  </section>
+
+  <!-- ══ TAB: feed ════════════════════════════════════════════════════ -->
+  <section x-show="tab === 'feed'" class="mt-8 space-y-4">
+
+    <div class="flex flex-wrap items-center gap-2">
+      <template x-for="f in filters" :key="f">
+        <button @click="filter = f"
+                class="rounded-full border px-3 py-1 text-xs capitalize transition"
+                :class="filter === f ? 'border-accent/50 bg-accent/15 text-accent' : 'border-line bg-surface text-muted hover:text-fg'">
+          <span x-text="f === 'all' ? 'all' : statusMeta[f].label"></span>
+          <span class="ml-1 tabular-nums opacity-60" x-text="f === 'all' ? data.issues.length : data.issues.filter(i => i.status === f).length"></span>
+        </button>
+      </template>
+      <span class="ml-auto text-xs text-muted">
+        Sorted by severity · <span class="font-mono" x-text="visible.length"></span> shown
+      </span>
+    </div>
+
+    <div class="overflow-hidden rounded-xl border border-line bg-surface">
+      <table class="w-full text-left text-sm">
+        <thead class="border-b border-line bg-raised/50 text-xs uppercase tracking-wider text-muted">
+          <tr>
+            <th class="px-5 py-3 font-medium">Finding</th>
+            <th class="px-5 py-3 font-medium">Severity</th>
+            <th class="px-5 py-3 font-medium">Status</th>
+            <th class="px-5 py-3 font-medium">Devin session</th>
+            <th class="px-5 py-3 text-right font-medium">ACUs</th>
+            <th class="w-8 px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-line/70">
+          <template x-for="issue in visible" :key="issue.number">
+            <tbody class="contents">
+            <tr class="cursor-pointer transition hover:bg-raised/50" @click="open = open === issue.number ? null : issue.number">
+              <td class="px-5 py-3.5">
+                <div class="flex items-center gap-2">
+                  <a :href="`https://github.com/${data.repo}/issues/${issue.number}`" target="_blank" @click.stop
+                     class="font-mono text-xs text-muted hover:text-accent" x-text="`#${issue.number}`"></a>
+                  <span class="font-medium" x-text="issue.title"></span>
+                </div>
+                <div class="mt-1 flex items-center gap-2 text-xs text-muted">
+                  <span class="rounded bg-raised px-1.5 py-0.5 font-mono" x-text="issue.category"></span>
+                  <span x-show="issue.advisory" class="font-mono" x-text="issue.advisory"></span>
+                </div>
+              </td>
+              <td class="px-5 py-3.5">
+                <span class="rounded-md border px-2 py-0.5 text-xs font-medium capitalize"
+                      :class="severityMeta[issue.severity]" x-text="issue.severity"></span>
+              </td>
+              <td class="px-5 py-3.5">
+                <span class="inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-xs font-medium"
+                      :class="statusMeta[issue.status].cls">
+                  <span x-text="statusMeta[issue.status].icon"></span>
+                  <span x-text="statusMeta[issue.status].label"></span>
+                </span>
+              </td>
+              <td class="px-5 py-3.5">
+                <template x-if="issue.session_url">
+                  <a :href="issue.session_url" target="_blank" @click.stop
+                     class="font-mono text-xs text-accent hover:underline"
+                     x-text="issue.session_url.split('/').pop().slice(0, 10) + '…'"></a>
+                </template>
+                <span x-show="!issue.session_url" class="text-xs text-muted">—</span>
+              </td>
+              <td class="px-5 py-3.5 text-right font-mono text-xs tabular-nums"
+                  :class="issue.acus ? 'text-fg' : 'text-muted'" x-text="issue.acus ? issue.acus.toFixed(1) : '—'"></td>
+              <td class="px-5 py-3.5 text-muted">
+                <span class="inline-block transition-transform" :class="open === issue.number && 'rotate-90'">›</span>
+              </td>
+            </tr>
+            <tr x-show="open === issue.number" class="bg-canvas/60">
+              <td colspan="6" class="px-5 py-4">
+                <p class="max-w-4xl text-sm leading-relaxed text-muted" x-text="issue.summary"></p>
+                <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                  <span class="rounded bg-raised px-2 py-1 font-mono text-muted" x-text="`fingerprint: ${issue.fingerprint}`"></span>
+                  <a x-show="issue.pull_request" :href="issue.pull_request" target="_blank"
+                     class="rounded border border-emerald-500/30 bg-emerald-500/10 px-2 py-1 text-emerald-300 hover:bg-emerald-500/20">Pull request ↗</a>
+                  <a x-show="issue.comment_url" :href="issue.comment_url" target="_blank"
+                     class="rounded border border-line bg-raised px-2 py-1 text-muted hover:text-fg">Status comment ↗</a>
+                  <a x-show="issue.session_url" :href="issue.session_url" target="_blank"
+                     class="rounded border border-line bg-raised px-2 py-1 text-muted hover:text-fg">Devin session ↗</a>
+                </div>
+              </td>
+            </tr>
+            </tbody>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ══ TAB: architecture ════════════════════════════════════════════ -->
+  <section x-show="tab === 'arch'" class="mt-8 space-y-6">
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <template x-for="w in data.workflows" :key="w.id">
+        <div class="rounded-xl border border-line bg-surface p-5">
+          <div class="flex items-center justify-between">
+            <h3 class="font-semibold" x-text="w.name"></h3>
+            <span class="rounded-md border px-2 py-0.5 text-xs font-medium"
+                  :class="w.kind === 'event' ? 'border-violet-500/30 bg-violet-500/10 text-violet-300' : 'border-sky-500/30 bg-sky-500/10 text-sky-300'"
+                  x-text="w.kind === 'event' ? 'event-driven' : 'periodic'"></span>
+          </div>
+          <p class="mt-2 font-mono text-xs text-muted" x-text="w.trigger"></p>
+          <a :href="`https://github.com/${data.repo}/blob/master/${w.file}`" target="_blank"
+             class="mt-3 inline-block font-mono text-xs text-accent hover:underline" x-text="w.file"></a>
+        </div>
+      </template>
+    </div>
+
+    <div class="grid-bg rounded-xl border border-line bg-surface p-6">
+      <h3 class="text-sm font-semibold uppercase tracking-wider text-muted">Dual-trigger pipeline</h3>
+
+      <div class="mt-6 grid gap-5 lg:grid-cols-2">
+        <!-- lane 1 -->
+        <div class="space-y-3">
+          <p class="text-xs font-semibold uppercase tracking-wider text-sky-300">① Discovery · cron</p>
+          <template x-for="(step, i) in laneScan" :key="i">
+            <div class="rounded-lg border border-line bg-raised/70 p-3.5">
+              <p class="text-sm font-medium" x-text="step.t"></p>
+              <p class="mt-1 font-mono text-xs leading-relaxed text-muted" x-text="step.d"></p>
+            </div>
+          </template>
+        </div>
+        <!-- lane 2 -->
+        <div class="space-y-3">
+          <p class="text-xs font-semibold uppercase tracking-wider text-violet-300">② Remediation · webhook</p>
+          <template x-for="(step, i) in laneRemediate" :key="i">
+            <div class="rounded-lg border p-3.5"
+                 :class="step.secure ? 'border-amber-500/30 bg-amber-500/5' : 'border-line bg-raised/70'">
+              <p class="text-sm font-medium">
+                <span x-text="step.t"></span>
+                <span x-show="step.secure" class="ml-1.5 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-300">holds secret</span>
+              </p>
+              <p class="mt-1 font-mono text-xs leading-relaxed text-muted" x-text="step.d"></p>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid gap-4 md:grid-cols-3">
+      <template x-for="g in guardrails" :key="g.t">
+        <div class="rounded-xl border border-line bg-surface p-5">
+          <p class="text-sm font-semibold" x-text="g.t"></p>
+          <p class="mt-1.5 text-xs leading-relaxed text-muted" x-text="g.d"></p>
+        </div>
+      </template>
+    </div>
+  </section>
+
+  <!-- ══ TAB: simulator ═══════════════════════════════════════════════ -->
+  <section x-show="tab === 'sim'" class="mt-8 grid gap-5 lg:grid-cols-2">
+
+    <div class="rounded-xl border border-line bg-surface p-6">
+      <h3 class="font-semibold">Trigger simulator</h3>
+      <p class="mt-1 text-xs text-muted">Renders the payload a <span class="font-mono">devin-remediate</span> run would send. Dry-run only — nothing is dispatched.</p>
+
+      <label class="mt-5 block text-xs uppercase tracking-wider text-muted">Issue</label>
+      <select x-model.number="simIssue"
+              class="mt-1.5 w-full rounded-lg border border-line bg-canvas px-3 py-2 text-sm outline-none focus:border-accent">
+        <template x-for="i in data.issues" :key="i.number">
+          <option :value="i.number" x-text="`#${i.number} — ${i.title}`"></option>
+        </template>
+      </select>
+
+      <div class="mt-4 grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-xs uppercase tracking-wider text-muted">Max ACU</label>
+          <input type="number" x-model.number="simAcu" min="1" max="100"
+                 class="mt-1.5 w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-sm outline-none focus:border-accent" />
+        </div>
+        <div>
+          <label class="block text-xs uppercase tracking-wider text-muted">Poll timeout (s)</label>
+          <input type="number" x-model.number="simTimeout" step="300"
+                 class="mt-1.5 w-full rounded-lg border border-line bg-canvas px-3 py-2 font-mono text-sm outline-none focus:border-accent" />
+        </div>
+      </div>
+
+      <button @click="simulate()"
+              class="mt-5 w-full rounded-lg bg-accent px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-accent/85">
+        Simulate remediation run
+      </button>
+
+      <template x-if="simLog.length">
+        <div class="mt-5 space-y-1.5 rounded-lg border border-line bg-canvas p-4 font-mono text-xs">
+          <template x-for="(l, i) in simLog" :key="i">
+            <p :class="l.cls" x-text="l.text"></p>
+          </template>
+        </div>
+      </template>
+    </div>
+
+    <div class="rounded-xl border border-line bg-surface p-6">
+      <div class="flex items-center justify-between">
+        <h3 class="font-semibold">Raw metrics</h3>
+        <button @click="copyJson()"
+                class="rounded-md border border-line bg-raised px-2.5 py-1 text-xs text-muted transition hover:text-fg"
+                x-text="copied ? 'copied ✓' : 'copy JSON'"></button>
+      </div>
+      <pre class="mt-4 max-h-[30rem] overflow-auto rounded-lg border border-line bg-canvas p-4 font-mono text-xs leading-relaxed text-muted" x-text="json"></pre>
+    </div>
+  </section>
+
+  <footer class="mt-10 border-t border-line pt-5 text-xs text-muted">
+    Static snapshot of the self-healing automation ·
+    <a :href="data.automation_pr" target="_blank" class="text-accent hover:underline">implementation PR</a> ·
+    generated <span class="font-mono" x-text="data.generated_at"></span>
+  </footer>
+</main>
+
+<script>
+function dashboard() {
+  const data = {
+    repo: "salman-devin/superset",
+    automation_pr: "https://github.com/salman-devin/superset/pull/10",
+    generated_at: "2026-07-30T18:35:00Z",
+    workflows: [
+      { id: "devin-maintenance-scan", name: "Devin maintenance scan", kind: "scheduled",
+        trigger: "schedule: weekdays + workflow_dispatch",
+        file: ".github/workflows/devin-maintenance-scan.md" },
+      { id: "devin-remediate", name: "Devin remediate", kind: "event",
+        trigger: "issues.labeled → devin-remediate (+ dispatch replay)",
+        file: ".github/workflows/devin-remediate.md" },
+    ],
+    issues: [
+      { number: 1, title: "Flask 2.3.3 → 3.1.3", advisory: "PYSEC-2026-2151", severity: "high",
+        category: "python-dependency", fingerprint: "py:flask:PYSEC-2026-2151", status: "in_progress",
+        session_url: "https://app.devin.ai/sessions/f90fb6e4ca2c4d1f931c2fc0a511d386", acus: 0, pull_request: null,
+        summary: "Session running. Verifying whether Flask 3 / Werkzeug 3 is compatible with the pinned flask-appbuilder stack before regenerating any lockfile." },
+      { number: 2, title: "setuptools 80.9.0 → 83.0.0", advisory: "PYSEC-2026-3447", severity: "high",
+        category: "python-dependency", fingerprint: "py:setuptools:PYSEC-2026-3447", status: "needs_human",
+        session_url: "https://app.devin.ai/sessions/3232d17a58724c589441d62654b855d0", acus: 3.4, pull_request: null,
+        comment_url: "https://github.com/salman-devin/superset/issues/2#issuecomment-5134157026",
+        summary: "Guardrail held. setuptools<81 is a deliberate pin: pkg_resources is removed from setuptools ≥82 and sqlalchemy-redshift<0.9 imports it at module load. The session reproduced the ModuleNotFoundError in a clean venv, established that the pkg_resources-free sqlalchemy-redshift 1.0.0 requires SQLAlchemy ≥2 (Superset pins <2), and escalated instead of shipping a breaking bump." },
+      { number: 3, title: "paramiko 3.5.1 SHA-1 RSA", advisory: "PYSEC-2026-2858", severity: "moderate",
+        category: "python-dependency", fingerprint: "py:paramiko:PYSEC-2026-2858", status: "not_auto_remediable",
+        session_url: null, acus: 0, pull_request: null,
+        summary: "No upstream fix released. Scan marks it Auto-remediable: no, so the remediation workflow noops and keeps tracking the advisory." },
+      { number: 4, title: "41 npm advisories in superset-frontend", advisory: "40 high / 1 critical", severity: "high",
+        category: "npm-dependency", fingerprint: "npm:brace-expansion:1124334", status: "queued",
+        session_url: null, acus: 0, pull_request: null,
+        summary: "Transitive chains collapsed to root packages: minimatch/brace-expansion DoS, shell-quote ReDoS, glob/rimraf. Remediable through package.json overrides." },
+      { number: 5, title: "eslint-plugin-i18n-strings name collision", advisory: "GHSA-55h3-fm53-wq99", severity: "critical",
+        category: "supply-chain", fingerprint: "npm:eslint-plugin-i18n-strings:1105139", status: "queued",
+        session_url: null, acus: 0, pull_request: null,
+        summary: "The local file: plugin shares a name with a malicious npm package. Fix is to scope or rename the workspace package so registry resolution can never shadow it." },
+      { number: 6, title: "Hardcoded node-version: 20 vs engines ^24.16.0", advisory: null, severity: "moderate",
+        category: "ci", fingerprint: "ci:node-version-drift", status: "queued",
+        session_url: null, acus: 0, pull_request: null,
+        summary: "Four workflows pin node 20 while package.json requires ^24.16.0. Small, mechanical, well suited to autonomous remediation." },
+      { number: 7, title: "230 type: ignore · 566 : any · 761 eslint-disable", advisory: null, severity: "low",
+        category: "code-quality", fingerprint: "quality:suppressions", status: "not_auto_remediable",
+        session_url: null, acus: 0, pull_request: null,
+        summary: "Too broad for a single autonomous PR. Tracked as a trend metric rather than a remediation target." },
+      { number: 8, title: "72 skipped tests", advisory: null, severity: "low",
+        category: "test-health", fingerprint: "quality:skipped-tests", status: "not_auto_remediable",
+        session_url: null, acus: 0, pull_request: null,
+        summary: "63 Python + 9 JS skips needing per-test triage by an owner who knows why each was disabled." },
+      { number: 9, title: "Oversized modules (security/manager.py 5044 LOC)", advisory: null, severity: "low",
+        category: "code-quality", fingerprint: "quality:module-size", status: "not_auto_remediable",
+        session_url: null, acus: 0, pull_request: null,
+        summary: "Refactor requires a design decision; explicitly out of scope for autonomous remediation." },
+    ],
+  };
+
+  const severityRank = { critical: 0, high: 1, moderate: 2, low: 3 };
+
+  return {
+    data,
+    tab: 'feed',
+    tabs: [
+      { id: 'feed',  label: 'Task feed' },
+      { id: 'arch',  label: 'Architecture' },
+      { id: 'sim',   label: 'Simulator' },
+    ],
+    filter: 'all',
+    open: null,
+    copied: false,
+    simIssue: 6,
+    simAcu: 20,
+    simTimeout: 4200,
+    simLog: [],
+
+    severityMeta: {
+      critical: 'border-red-500/30 bg-red-500/10 text-red-300',
+      high:     'border-orange-500/30 bg-orange-500/10 text-orange-300',
+      moderate: 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+      low:      'border-line bg-raised text-muted',
+    },
+    statusMeta: {
+      pr_generated:        { label: 'PR generated',  icon: '✓', cls: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' },
+      in_progress:         { label: 'In progress',   icon: '◐', cls: 'border-accent/40 bg-accent/10 text-accent' },
+      needs_human:         { label: 'Guardrail held', icon: '⚑', cls: 'border-amber-500/30 bg-amber-500/10 text-amber-300' },
+      queued:              { label: 'Queued',        icon: '·', cls: 'border-line bg-raised text-muted' },
+      not_auto_remediable: { label: 'Human-owned',   icon: '⊘', cls: 'border-line bg-raised text-muted' },
+    },
+    filters: ['all', 'in_progress', 'needs_human', 'queued', 'not_auto_remediable'],
+
+    get visible() {
+      return this.data.issues
+        .filter(i => this.filter === 'all' || i.status === this.filter)
+        .sort((a, b) => severityRank[a.severity] - severityRank[b.severity] || a.number - b.number);
+    },
+    get stats() {
+      const i = this.data.issues;
+      const sessions = i.filter(x => x.session_url);
+      const resolved = sessions.filter(x => x.status === 'pr_generated' || x.status === 'needs_human');
+      const acus = i.reduce((s, x) => s + (x.acus || 0), 0);
+      return [
+        { label: 'Issues tracked', value: i.length, icon: '📋', tone: 'text-fg',
+          hint: `${i.filter(x => x.severity === 'critical' || x.severity === 'high').length} high or critical` },
+        { label: 'Sessions started', value: sessions.length, icon: '🤖', tone: 'text-accent',
+          hint: `${i.filter(x => x.status === 'in_progress').length} running · ${acus.toFixed(1)} ACUs used` },
+        { label: 'Resolved by agent', value: resolved.length, icon: '✅', tone: 'text-emerald-400',
+          hint: `${i.filter(x => x.status === 'pr_generated').length} PRs · ${i.filter(x => x.status === 'needs_human').length} escalated` },
+        { label: 'Guardrail rate', value: sessions.length ? Math.round(i.filter(x => x.status === 'needs_human').length / resolved.length * 100) + '%' : '—',
+          icon: '🛡️', tone: 'text-amber-300', hint: 'unsafe fixes refused, not forced' },
+      ];
+    },
+    get json() {
+      return JSON.stringify({
+        repo: this.data.repo,
+        generated_at: this.data.generated_at,
+        totals: {
+          issues: this.data.issues.length,
+          sessions: this.data.issues.filter(i => i.session_url).length,
+          acus_consumed: +this.data.issues.reduce((s, x) => s + (x.acus || 0), 0).toFixed(1),
+        },
+        by_status: this.filters.filter(f => f !== 'all').reduce((o, f) => {
+          o[f] = this.data.issues.filter(i => i.status === f).length; return o;
+        }, {}),
+        issues: this.data.issues,
+      }, null, 2);
+    },
+
+    laneScan: [
+      { t: 'schedule: weekdays', d: 'cron in devin-maintenance-scan.lock.yml' },
+      { t: 'deterministic scan step', d: 'pip-audit + npm audit → scan.py → findings.json' },
+      { t: 'read-only agent', d: 'dedups on Fingerprint:, ranks by severity' },
+      { t: 'safe-output: create-issue', d: 'labels: maintenance, automated-scan, devin-remediate' },
+    ],
+    laneRemediate: [
+      { t: 'issues.labeled webhook', d: 'gh-aw label_command; label removed on activation' },
+      { t: 'read-only agent', d: 'reads issue, decides remediable vs noop, emits plan' },
+      { t: 'safe-outputs.jobs step', d: 'POST /v3/organizations/{org}/sessions → poll session', secure: true },
+      { t: 'observable output', d: 'issue comment: session URL, status, outcome, PR links' },
+    ],
+    guardrails: [
+      { t: 'Secret isolation', d: 'DEVIN_API_KEY is injected only into the safe-output job. The agent sandbox never sees it, and network access is allowlisted.' },
+      { t: 'Structured outcomes', d: 'Sessions must return a validated schema (fixed / partially_fixed / not_fixed / needs_human), so status reporting never parses prose.' },
+      { t: 'Bounded spend', d: 'max_acu_limit per session plus a polling timeout; the workflow reports a live session link rather than hanging.' },
+    ],
+
+    simulate() {
+      const issue = this.data.issues.find(i => i.number === this.simIssue);
+      const ok = issue.status !== 'not_auto_remediable';
+      const dim = 'text-muted', good = 'text-emerald-300', warn = 'text-amber-300';
+      this.simLog = [
+        { text: `POST /repos/${this.data.repo}/issues/${issue.number}/labels ["devin-remediate"]`, cls: dim },
+        { text: `→ workflow devin-remediate triggered (issues.labeled)`, cls: dim },
+        { text: `→ agent reads issue #${issue.number} · fingerprint ${issue.fingerprint}`, cls: dim },
+      ];
+      if (!ok) {
+        this.simLog.push({ text: `→ noop: issue marked Auto-remediable: no — no session started`, cls: warn });
+        return;
+      }
+      this.simLog.push(
+        { text: `→ start_devin_remediation(issue_number=${issue.number}, max_acu=${this.simAcu})`, cls: dim },
+        { text: JSON.stringify({ prompt: `remediate #${issue.number}: ${issue.title}`, max_acu_limit: this.simAcu, structured_output_schema: 'outcome|summary|pull_request_url|verification|blockers' }), cls: dim },
+        { text: `→ POST /v3/organizations/{org}/sessions → 200 session_id`, cls: good },
+        { text: `→ poll every 30s for up to ${this.simTimeout}s`, cls: dim },
+        { text: `→ gh issue comment #${issue.number}: session URL + outcome + PR links`, cls: good },
+      );
+    },
+    copyJson() {
+      navigator.clipboard.writeText(this.json);
+      this.copied = true;
+      setTimeout(() => (this.copied = false), 1500);
+    },
+  };
+}
+</script>
+</body>
+</html>
